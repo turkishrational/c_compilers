@@ -1,0 +1,1 @@
+tcc -g -I. -I../include -I../include/sys -B.. -o cc.exe cc.c
