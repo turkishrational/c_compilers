@@ -1,0 +1,33 @@
+If files are saved with new lines ending in CRLF 
+(for reading in Wordpad and then Notepad), 
+CPP gives an error. 
+It works correctly if saved with Unix text format
+(new line = LF). 
+The CPP.EXE file here will be adapted for CRLF later
+(TRDOS 386 uses CRLF. When adapting the code
+for TRDOS 386, CRLF should be expected 
+at the end of lines where LF is expected).
+((mysys2-mingw32))
+
+Erdogan Tan - 21/04/2026
+
+****
+
+22/04/2026 (possible reason)
+For "trailing garbage after directive" error message,
+possible reason:
+CR (13) is defined as TOKEN_SPACE (in "token.c" file)
+while LF (10) is defined as 0 (ZERO). (token_class)
+To change TOKEN_SPACE to 0 (for CR) may be 
+the solution of the "trailing garbage" error/problem.
+
+****
+
+NOTE: This issue does not occur when CPP.EXE
+      is compiled via LLVM-MINGW2. (22/04/2026)
+      -EXAMPLE3-
+
+(22/04/2026)
+However, the same problem persists for header files 
+(files used with the "#include" directive).
+(In EXAMPLE3, there is no "#include <stdio.h>" etc.)
