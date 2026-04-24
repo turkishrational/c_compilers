@@ -1,0 +1,1 @@
+gcc -g -o cc1.exe cc1.c lex.c output.c string.c util.c error.c
