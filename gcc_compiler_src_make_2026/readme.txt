@@ -1,5 +1,5 @@
 Using gcc-1.27.tar.bz2 files (and manually applying some patches),
-With the help of Google AI,
+with the help of Google AI,
 I was able to compile 1988 gcc files on the MINGW32 system
 (Windows 7 -64bit- host).
 
