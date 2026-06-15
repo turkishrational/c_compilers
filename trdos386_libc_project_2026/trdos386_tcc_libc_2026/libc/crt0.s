@@ -24,7 +24,7 @@ _start:
     
     /* System exit routine via TRDOS 386 Kernel */
     mov ebx, eax                    /* Forward main's exit code to EBX for TRDOS */
-    mov eax, 1                      /* TRDOS sys_exit system call number *
+    mov eax, 1                      /* TRDOS sys_exit system call number */
     int 0x40                        /* Call TRDOS 386 Kernel */
 
     .byte 0	
