@@ -1,0 +1,50 @@
+#define NULL ((void*)0)
+
+typedef unsigned int size_t_trdos;
+
+/* GCC compiler maps C symbols to underscore prefix. 
+   To provide "__mingw_free" to the linker, we define "_mingw_free" in C code. */
+// void _mingw_free(void *ptr) {}
+// void *_mingw_realloc(void *ptr, size_t_trdos size) { return ptr; }
+
+/* Fixed: Explicit implementation for missing ldexpl function */
+double ldexpl(double x, int exp) { return x; }
+
+/* Kalan standart stub yapýsý */
+long strtol(const char *nptr, char **endptr, int base) { return 0; }
+unsigned long strtoul(const char *nptr, char **endptr, int base) { return 0; }
+long long strtoll(const char *nptr, char **endptr, int base) { return 0; }
+unsigned long long strtoull(const char *nptr, char **endptr, int base) { return 0; }
+char *getcwd(char *buf, size_t_trdos size) { if (buf && size > 0) buf = '\0'; return buf; }
+char *_fullpath(char *absPath, const char *relPath, size_t_trdos maxLength) { return absPath; }
+int unlink(const char *filename) { return 0; }
+void qsort(void *base, unsigned int nitems, unsigned int size, int (*compar)(const void *, const void *)) {}
+void *fdopen(int handle, const char *mode) { return (void*)handle; }
+
+int _snprintf(char *buffer, unsigned int count, const char *format, ...) {
+    char *p = (char*)format;
+    unsigned int i = 0;
+    if (count == 0) return 0;
+    while(*p && i < count - 1) { buffer[i++] = *p++; }
+    buffer[i] = '\0';
+    return i;
+}
+int _vsnprintf(char *buffer, unsigned int count, const char *format, void *argptr) { return _snprintf(buffer, count, format); }
+int __mingw_vfprintf(void *stream, const char *format, void *argptr) { return 0; }
+int __mingw_vprintf(const char *format, void *argptr) { return 0; }
+int __mingw_vsprintf(char *buffer, const char *format, void *argptr) { return _snprintf(buffer, 4096, format); }
+
+int _errno = 0;
+char *strerror(int errnum) { return "TRDOS LIBC Error"; }
+long long time(long long *tloc) { return 0; }
+void *localtime(const long long *timer) { return NULL; }
+int _setjmp(void *env) { return 0; }
+void longjmp(void *env, int val) {}
+void __stdcall InitializeCriticalSection(void *lpCriticalSection) {}
+void __stdcall EnterCriticalSection(void *lpCriticalSection) {}
+void __stdcall LeaveCriticalSection(void *lpCriticalSection) {}
+
+float strtof(const char *nptr, char **endptr) { return 0.0f; }
+long double strtold(const char *nptr, char **endptr) { return 0.0L; }
+double __strtod(const char *nptr, char **endptr) { return 0.0; }
+unsigned long __stdcall GetModuleFileNameA(void* hModule, char* lpFilename, unsigned long nSize) { return 0; }
