@@ -1,5 +1,5 @@
 trdos 386 'tcc compiler port' tcc-libc project
-by help of Google AI...
+by help of Google AI ...
 
 Almost all of libc (asm source files, -GAS-) here
 are written by help of Google AI.
