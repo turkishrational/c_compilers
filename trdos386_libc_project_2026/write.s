@@ -1,67 +1,77 @@
-; ****************************************************************************
-; write.s - TRDOS 386 C Standard Library (LIBC 2026)
-; ----------------------------------------------------------------------------
-; Output Stream & File Writing Logic for C Compilers (GCC 1.27 / TCC) Porting
-; Implementation of: int write(int fd, const void *buf, int count)
-; ****************************************************************************
-
-global _write
-
-[BITS 32]
+.intel_syntax noprefix
+.global _write
+.text
 
 _write:
-    push    ebx             ; Preserve EBX (POSIX / C Calling Convention requirement)
-    push    esi             ; Preserve ESI (Callee-saved register)
-                            ; Stack dropped by 8 bytes total!
+    push ebp
+    mov ebp, esp
+    push ebx
+    push esi
+    push edi
 
-    ; Original offsets before pushes: fd=[esp+4], buf=[esp+8], count=[esp+12]
-    ; New offsets after 8-byte stack shift:
-    mov     ebx, [esp+12]   ; Argument 1: LIBC File Descriptor (fd)
-    cmp     ebx, 3
-    jb      .std_out        ; If fd < 3 (stdin/out/err), route to sys_stdio (46)
+    mov ebx, [ebp + 8]    /* Argument 1: fd (File Descriptor) */
+    mov esi, [ebp + 12]   /* Argument 2: buf (Buffer pointer) */
+    mov edi, [ebp + 16]   /* Argument 3: count (Byte count) */
 
-    ; 1. Regular File Writing Routine (fd >= 3)
-    sub     ebx, 3          ; Convert LIBC FD (3-12) to Kernel FD (0-9)
-    mov     ecx, [esp+16]   ; Argument 2: Source Buffer Pointer (buf)
-    mov     edx, [esp+20]   ; Argument 3: Byte Count to Write (count)
-    mov     eax, 4          ; sys_write (EAX = 4)
-    int     40h             ; Call TRDOS 386 Kernel
-    jnc     .success        ; If CF=0, EAX contains written bytes, branch to exit
+    cmp ebx, 3
+    jb .L_write_stdio     /* If fd < 3 (0, 1, 2), route to console sys_stdio */
 
-.fail:
-    mov     eax, -1         ; On error, return standard C error indicator (-1)
-    jmp     .done
+    /* -----------------------------------------------------------------------
+       Standard File Write (sys_write)
+       ----------------------------------------------------------------------- */
+    sub ebx, 3            /* Convert C-FD to TRDOS-FD */
+    mov ecx, esi          /* ECX = buffer address */
+    mov edx, edi          /* EDX = byte count */
+    mov eax, 4            /* EAX = 4 (TRDOS 386 sys_write) */
+    int 0x40
+    jnc .L_write_done
+    jmp .L_write_fail
 
-.std_out:
-    ; Validate fd for write operations: 1 (stdout) or 2 (stderr) are valid.
-    ; fd=0 (stdin) is invalid for writing.
-    cmp     bl, 1           ; Check if fd is at least 1 (stdout)
-    jb      short .fail     ; If fd == 0 (stdin), abort with error (-1)
-    
-    xor     edx, edx        ; Clear character counter (edx = 0)
-    inc     ebx             ; Map LIBC FD (1 or 2) to sys_stdio sub-functions:
-                            ; BL=2 (stdout) or BL=3 (stderr)
+    /* -----------------------------------------------------------------------
+       Console Output Write Loop (sys_stdio - Character by Character)
+       ----------------------------------------------------------------------- */
+.L_write_stdio:
+    cmp ebx, 0
+    je .L_write_fail      /* Writing to stdin (fd=0) is invalid */
 
-    mov     esi, [esp+16]   ; Fetch buf pointer (Offset shifted to +16)
+    /* Map C-FD to TRDOS sys_stdio BL codes: fd=1 (stdout) -> BL=2, fd=2 (stderr) -> BL=3 */
+    cmp ebx, 2
+    je .L_set_stderr
+    mov bl, 2             /* BL = 2 (stdout onto screen with redirection support) */
+    jmp .L_init_loop
+.L_set_stderr:
+    mov bl, 3             /* BL = 3 (stderr onto screen without redirection) */
 
-.std_out_next:
-    lodsb                   ; Load next character from [ESI] into AL, and inc ESI
-    mov     cl, al          ; Move character into CL as required by sys_stdio
-    mov     eax, 46         ; sys_stdio (EAX = 46)
-    int     40h             ; Call TRDOS 386 Kernel
-    jc      short .ok       ; If carry flag is set (kernel error), break loop
-    
-    inc     edx             ; Increment successfully written character count
-    cmp     edx, [esp+20]   ; Check against count limit (Offset shifted to +20)
-    jb      .std_out_next   ; Loop until all characters are processed
+.L_init_loop:
+    xor edx, edx          /* EDX = Character counter (bytes written) */
 
-.ok:
-    mov     eax, edx        ; Return the total number of characters written
-    jmp     .done
+.L_stdio_loop_next:
+    cmp edx, edi          /* Check if counter (EDX) has reached count (EDI) */
+    jnb .L_stdio_loop_ok
 
-.success:
-    ; EAX already contains the number of bytes written by the kernel
-.done:
-    pop     esi             ; Restore ESI
-    pop     ebx             ; Restore EBX
-    retn
+    mov cl, [esi]         /* CL = ASCII character code to be printed */
+    test cl, cl           /* Check for ASCIIZ null terminator */
+    jz .L_stdio_loop_ok
+
+    mov ch, 0             /* CH = 0 (No CGA color attribute used here) */
+    mov eax, 46           /* EAX = 46 (TRDOS 386 sys_stdio) */
+    int 0x40              /* Call kernel to print a single character in CL */
+    jc .L_write_fail      /* If CF=1, kernel returned a hard hardware/I/O error */
+
+    inc edx               /* Increment processed characters counter */
+    inc esi               /* Advance buffer pointer to the next character */
+    jmp .L_stdio_loop_next
+
+.L_stdio_loop_ok:
+    mov eax, edx          /* Return total number of bytes successfully written */
+    jmp .L_write_done
+
+.L_write_fail:
+    mov eax, -1           /* Return -1 on error */
+
+.L_write_done:
+    pop edi
+    pop esi
+    pop ebx
+    pop ebp
+    ret

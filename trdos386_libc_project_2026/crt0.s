@@ -1,35 +1,39 @@
-; -----------------------------------------------------------
-; TRDOS 386 - Crt0.o template - Erdogan tan - 14/04/2026
-; -----------------------------------------------------------
-; nasm -Fo CRT0.ASM
-;
-; https://github.com/adamsch1/scc (smc386c.c)
+.intel_syntax noprefix
+.global _start
+.extern _main
+.text
 
-extern _main
+_start:
+    jmp .L_START                    /* TRDOS 386 PRG execution entry jump */
 
-;B+ System header
-	use32
-  	jmp	START	; TRDOS 386 PRG file doesn't contain header
+    .ascii "CRT0"
 
-  	db  "CRT0"
-START:
-  	; esp = argc
-  	; esp+4 = argv[0] address
-	pop	eax	; argc (value)
-	mov	ebx,esp	; argv[0] address (not value)
-	push	eax	; argc
-	push	ebx
+.L_START:
+    .extern _end                    /* from 'trdos386.ld' linker script ... end of bss */
+    mov ebx, offset _end            /* set new u.break address to end of bss */
+    mov eax, 17                     /* sysbreak ... kernel clears memory space */
+    int 0x40                        /*  between the new (_end) and old u.break address */
 
-	call	_main
-	;add	esp,8
-	pop	ebx
-  	;
-	xor	ebx,ebx	; exit code = 0
-	mov	eax,1	; sysexit
-	int	40h
+    /* esp points to argc directly */
+    pop eax                         /* eax = argc (value) */
+    mov ebx, esp                    /* ebx = argv[0] pointer address (not value) */
 
-	db 0	
-	db "C Compiler v1.0 for TRDOS 386"
-	db 0
-	db "Erdogan Tan - 2026"
-	db 0
+    push ebx                        /* Pass argv pointer to main (Argument 2) */
+    push eax                        /* Pass argc value to main (Argument 1) */
+
+    call _main                      /* Execute main function of TCC/program */
+
+    /* At this point, main's return/exit code is inside EAX register */
+
+    add esp, 8                      /* Clean up the 2 arguments from stack */
+    
+    /* System exit routine via TRDOS 386 Kernel */
+    mov ebx, eax                    /* Forward main's exit code to EBX for TRDOS */
+    mov eax, 1                      /* TRDOS sys_exit system call number */
+    int 0x40                        /* Call TRDOS 386 Kernel */
+
+    .byte 0
+    .ascii "C Compiler v1.0 for TRDOS 386"
+    .byte 0
+    .ascii "Erdogan Tan - 2026"
+    .byte 0
