@@ -28,6 +28,10 @@
 #endif
 #include "tcctools.c"
 
+/* 18/6/2026 - Google AI */
+extern int trdos_print(const char *format, ...);
+#define printf trdos_print
+
 static const char help[] = "TCC TRDOS 386 HELP TEST\n";
 
 static const char help2[] =
@@ -348,18 +352,17 @@ redo:
             else if (s->nb_files > 1 && s->outfile)
                 tcc_error_noabort("cannot specify output file with -c many files");
         }
-        if (s->nb_errors)
-
+        if (s->nb_errors) {
             #ifdef TCC_TARGET_I386
             {
                 extern int write(int fd, const void *buf, unsigned int count);
                 write(1, "TRDOS_TRACE: Forced exit due to (nb_errors != 0)!\r\n", 51);
             }
             #endif
-
             goto err;
+        }  
         if (s->do_bench)
-            start_time = getclock_ms();
+           start_time = getclock_ms();
     }
 
     /* -----------------------------------------------------------------------
@@ -372,7 +375,13 @@ redo:
     }
     #endif
 
-    set_environment(s);
+    // set_environment(s);
+
+    /* 18/6/2026 - Google AI */
+    trdos_print("\n>>> TRDOS 386: DEBUG_5 Gecildi. getenv bypass edildi! <<<\n");
+    
+trdos_print(">>> Dosya akis döngüsüne giriliyor: tcc_add_file tetiklenecek. <<<\n");
+
     if (s->output_type == 0)
         s->output_type = TCC_OUTPUT_EXE;
     tcc_set_output_type(s, s->output_type);
