@@ -4,6 +4,7 @@
 .global _fprintf
 .global __mingw_fprintf
 .global _printf
+.global _trdos_print
 .global __print
 
 .text
@@ -12,6 +13,18 @@
 /* =========================================================================
    1. LIBC ENTRY POINTS (BRIDGES)
    ========================================================================= */
+
+_trdos_print:
+    push ebp
+    mov ebp, esp
+    lea eax, [ebp + 12]   /* Variable arguments head (ap) */
+    push eax
+    push dword ptr [ebp + 8] /* format string address */
+    push 1                /* Default STDOUT FD = 1 */
+    call __print
+    add esp, 12
+    pop ebp
+    ret
 
 _vfprintf:
 __mingw_vfprintf:
@@ -61,24 +74,25 @@ __print:
     push ebx              /* Protect EBX */
     push esi              /* Protect ESI */
     push edi              /* Protect EDI */
-    
+
     mov edx, [ebp + 8]    /* edx = File Descriptor */
     mov esi, [ebp + 12]   /* esi = format string */
     mov edi, [ebp + 16]   /* edi = ap (argument stack pointer) */
     xor ebx, ebx          /* ebx = cc (total output char counter) */
 
 .L_parse_loop:
-    movzx eax, byte ptr [esi]
-    test al, al
+    mov al, byte ptr [esi]
+
+    test al, al           /* null character check */
     jz .L_parse_done
 
     cmp al, '%'
     je .L_handle_format
 
     /* --- BUFFERED CHUNK SCANNER --- */
-    mov ecx, esi          
+    mov ecx, esi
 .L_scan_raw:
-    movzx eax, byte ptr [ecx]
+    mov al, byte ptr [ecx]
     test al, al
     jz .L_write_chunk
     cmp al, '%'
@@ -90,49 +104,71 @@ __print:
 
 .L_write_chunk:
     sub ecx, esi          /* ecx = length of raw text chunk */
-    test ecx, ecx
+                          /* test ecx, ecx */
     jz .L_check_lf
 
+    push ecx
     push edx              /* Protect context registers */
+
     push ecx              /* Arg 3: count */
     push esi              /* Arg 2: buffer pointer */
     push edx              /* Arg 1: File Descriptor */
     call _write
     add esp, 12
+
     pop edx
-    
+    pop ecx
+
     add ebx, ecx          /* cc += chunk len */
     add esi, ecx          /* advance format pointer */
-    jmp .L_parse_loop
+
+    // jmp .L_parse_loop
 
 .L_check_lf:
-    movzx eax, byte ptr [esi]
-    cmp al, 10
-    jne .L_parse_loop     
-    
-    /* Inject "\r\n" cleanly via stack frame buffer */
-    sub esp, 4
-    mov word ptr [esp], 0x0A0D 
-    
+    cmp byte ptr [esi], 10 /* LF */
+    jne .L_parse_loop
+
+    mov eax, offset .L_crlf_str /* CRLF address */
+    mov ecx, 2            /* Arg 3: byte count = 2 (\r\n) */
+
+    cmp esi, [ebp + 12]   /* Is it the starting address? */
+
+    je .L_inject_crlf     /* Yes, insert \r\n instead of \n */
+
+    cmp byte ptr [esi - 1], 13 /* check the previous character */
+    jne .L_inject_crlf
+
+.L_only_lf:               /* It is \r, don't add \r again! */
+    dec ecx               /* mov ecx, 1 */
+    inc eax               /* mov eax, offset .L_only_lf_str */
+
+.L_inject_crlf:		  /* replace \n with \r\n */
+    push ecx
     push edx
-    push 2                /* 2 bytes count */
-    lea eax, [esp + 4]    /* stack pointer to "\r\n" */
-    push eax
-    push edx              /* FD */
+
+    push ecx              /* 2 or 1 */
+    push eax              /* offset .L_crlf_str or .L_only_lf_str */
+                          /* Arg 2: Buffer address */
+    push edx              /* Arg 1: File Descriptor */
     call _write
     add esp, 12
+
     pop edx
-    add esp, 4
-    
-    add ebx, 2            
+    pop ecx
+
+    add ebx, ecx          /* increase total char count by 2 or 1 */
+.L_lf_done:
     inc esi               /* Skip LF */
+
     jmp .L_parse_loop
 
 .L_handle_format:
     inc esi               /* Skip '%' */
-    movzx eax, byte ptr [esi]
+    mov al, byte ptr [esi]
     test al, al
     jz .L_parse_done
+
+    mov ecx, 1
 
     cmp al, '%'
     je .L_write_escaped_percent
@@ -144,7 +180,7 @@ __print:
     jg .L_check_specifiers
 .L_skip_width:
     inc esi
-    movzx eax, byte ptr [esi]
+    mov al, byte ptr [esi]
     cmp al, '0'
     jl .L_check_specifiers
     cmp al, '9'
@@ -159,63 +195,57 @@ __print:
     je .L_fmt_char
     cmp al, 'x'
     je .L_fmt_hex
+    cmp al, 'X'
+    je .L_fmt_hex
     cmp al, 'u'
     je .L_fmt_unsigned
 
+.L_unknown_format:
+    mov ah, al
+    mov	al, '%'
+    inc	ecx              /* mov ecx, 2 */
+
 .L_write_escaped_percent:
-    sub esp, 4
-    mov byte ptr [esp], al
+.L_fmt_char_w:
+    // sub esp, 4
+    // mov byte ptr [esp], al
+    push eax             /* sub esp, 4 .. mov [esp], al */
+
+    add ebx, ecx         /* 'add ebx, 1' or 'add ebx, 2' */
+    lea eax, [esp]
     push edx
-    push 1
-    lea eax, [esp + 4]
+    push ecx             /* 'push 1' or 'push 2' */
     push eax
     push edx
     call _write
     add esp, 12
     pop edx
     add esp, 4
-    inc ebx
+    //inc ebx
     inc esi
     jmp .L_parse_loop
 
 .L_fmt_char:
-    mov eax, [edi]        
+    mov eax, [edi]
     add edi, 4
-    sub esp, 4
-    mov byte ptr [esp], al
-    
-    push edx
-    push 1
-    lea eax, [esp + 4]
-    push eax
-    push edx
-    call _write
-    add esp, 12
-    pop edx
-    add esp, 4
-    
-    inc ebx
-    inc esi 
-    jmp .L_parse_loop
+    jmp .L_fmt_char_w
 
 .L_fmt_string:
-    mov eax, [edi]        
+    mov eax, [edi]
     add edi, 4
     test eax, eax
     jnz .L_str_valid
     mov eax, offset .L_null_str /* Inline flat memory address reference */
 .L_str_valid:
-    push edx              
-    push eax              
-    call _strlen          
-    add esp, 4
-    pop edx
-    
-    test eax, eax
-    jz .L_fmt_str_done    
-    
-    push ebx              
     push edx
+    push eax
+    call _strlen
+    add esp, 4
+
+    test eax, eax
+    jz .L_fmt_str_done
+
+    push ebx
     push eax              /* Arg 3: total string length */
     mov ecx, [edi - 4]    /* Reload string pointer safely */
     test ecx, ecx
@@ -226,10 +256,10 @@ __print:
     push edx              /* Arg 1: FD */
     call _write
     add esp, 12
-    pop edx
     pop ebx
     add ebx, eax          /* Accumulate cc */
 .L_fmt_str_done:
+    pop edx
     inc esi
     jmp .L_parse_loop
 
@@ -237,99 +267,57 @@ __print:
     sub esp, 32           /* Allocate temporary local scratchpad frame */
     mov eax, [edi]
     add edi, 4
-    lea ecx, [esp]        
-    push ecx              
-    push eax              
-    call _itoa            
+    lea ecx, [esp]
+    push edx              /* FD */
+
+    push ecx              /* buffer address */
+    push eax              /* integer */
+    call _itoa
     add esp, 8
 
-    lea eax, [esp]
-    push edx
+.L_fmt_w_digits:	  /* top of stack = edx (FD) */
+    lea eax, [esp+4]      /* buffer */
     push eax
     call _strlen
-    add esp, 4
-    pop edx
+    pop edx               /* add esp, 4 */
+    pop edx               /* FD */
 
-    push ebx
+    push ebx              /* character count */
     push edx
-    push eax              
-    lea ecx, [esp + 8]    
+
+    push eax
+    lea  ecx, [esp+12]	  /* buffer */
     push ecx
     push edx
     call _write
     add esp, 12
+
     pop edx
     pop ebx
-    add ebx, eax          
-    add esp, 32           
+    add ebx, eax
+    add esp, 32
     inc esi
     jmp .L_parse_loop
 
 .L_fmt_hex:
+    mov eax, 16
+.L_fmt_hex_u:
     sub esp, 32
+    lea ecx, [esp]
+    push edx              /* FD */
+    push eax	          /* push 16 */
+    push ecx
     mov eax, [edi]
     add edi, 4
-    lea ecx, [esp]
-    push 16               
-    push ecx              
-    push eax              
-    call _itoab           
-    add esp, 12
-    
-    lea eax, [esp]
-    push edx
-    push eax
-    call _strlen
-    add esp, 4
-    pop edx
-
-    push ebx
-    push edx
-    push eax              
-    lea ecx, [esp + 8]    
-    push ecx
-    push edx
-    call _write
-    add esp, 12
-    pop edx
-    pop ebx
-    add ebx, eax
-    add esp, 32
-    inc esi
-    jmp .L_parse_loop
-
-.L_fmt_unsigned:
-    sub esp, 32
-    mov eax, [edi]
-    add edi, 4
-    lea ecx, [esp]
-    push 10               
-    push ecx
     push eax
     call _itoab
     add esp, 12
-    
-    lea eax, [esp]
-    push edx
-    push eax
-    call _strlen
-    add esp, 4
-    pop edx
 
-    push ebx
-    push edx
-    push eax              
-    lea ecx, [esp + 8]    
-    push ecx
-    push edx
-    call _write
-    add esp, 12
-    pop edx
-    pop ebx
-    add ebx, eax
-    add esp, 32
-    inc esi
-    jmp .L_parse_loop
+    jmp .L_fmt_w_digits
+
+.L_fmt_unsigned:
+    mov	eax, 10
+    jmp .L_fmt_hex_u
 
 .L_parse_done:
     mov eax, ebx          /* EAX = final written characters count */
@@ -345,3 +333,8 @@ __print:
    ========================================================================= */
 .L_null_str:
     .ascii "(null)\0"
+
+.L_crlf_str:          /* \r (13) & \n (10) - CRLF */
+    .byte 13
+.L_only_lf_str:       /* \n (10) - LF */
+    .byte 10, 0
