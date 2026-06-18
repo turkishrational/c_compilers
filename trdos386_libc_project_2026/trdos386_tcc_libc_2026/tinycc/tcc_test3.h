@@ -66,21 +66,13 @@
             "movb $0x0C, %%dl\n\t" /* DL  = Light Red color attribute */ \
             "movl $35, %%eax\n\t"  /* EAX = 35 (sysmsg) */ \
             "int $0x40\n\t"        /* Print the warning message */ \
-            : \
-            : "g" (exit_dbg) \
-            : "eax", "ebx", "ecx", "edx" \
-        ); \
-        \
-        /* 19/6/2026 - Çýkýþ kodunu (status) ekrana basarak hatanýn türünü anlýyoruz */ \
-        trdos_print("-> TRDOS_TRACE: Exit Status (Hata Kodu): %d\n", (status)); \
-        \
-        __asm__ __volatile__ ( \
-            "movl %0, %%ebx\n\t"   /* EBX = exit status code */ \
+            \
+            "movl %1, %%ebx\n\t"   /* EBX = exit status code */ \
             "movl $1, %%eax\n\t"   /* EAX = 1 (sys_exit) */ \
             "int $0x40\n\t"        /* Terminate the process via TRDOS kernel */ \
             : \
-            : "r" (status) \
-            : "eax", "ebx" \
+            : "g" (exit_dbg), "r" (status) \
+            : "eax", "ebx", "ecx", "edx" \
         ); \
     } while(0)
 

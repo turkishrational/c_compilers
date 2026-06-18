@@ -66,11 +66,6 @@
 
 #include "tcc.h"
 
-/* 18/6/2026 - Google AI - Debug */
-extern int trdos_print(const char *format, ...);
-
-#define printf trdos_print
-
 /********************************************************/
 /* global variables */
 
@@ -702,45 +697,29 @@ LIBTCCAPI void tcc_set_error_func(TCCState *s, void *error_opaque, TCCErrorFunc 
     s->error_func = error_func;
 }
 
-#undef _tcc_error
-PUB_FUNC void _tcc_error(const char *fmt, ...)
-{
-    va_list ap;
-    
-    /* 19/6/2026 - TRDOS 386: Ölümcül Hata Kancasý */
-    trdos_print("\n[!!! TCC_ERROR !!!] Derleyici Olumcul Hata Yakaladi:\n");
-    trdos_print("-> Format Metni: %s\n", fmt);
-
-    va_start(ap, fmt);
-    error1(ERROR_ERROR, fmt, ap);
-    va_end(ap);
-    
-    exit(1);
-}
-#define _tcc_error use_tcc_error_noabort
-
+/* error without aborting current compilation */
 PUB_FUNC int _tcc_error_noabort(const char *fmt, ...)
 {
     va_list ap;
-    
-    /* 19/6/2026 - TRDOS 386: Abort Olmayan Hata Kancasý */
-    trdos_print("\n[! TCC_ERROR_NOABORT !] Derleyici Hata Yakaladi (Devam Edilebilir):\n");
-    trdos_print("-> Format Metni: %s\n", fmt);
-
     va_start(ap, fmt);
     error1(ERROR_NOABORT, fmt, ap);
     va_end(ap);
     return -1;
 }
 
+#undef _tcc_error
+PUB_FUNC void _tcc_error(const char *fmt, ...)
+{
+    va_list ap;
+    va_start(ap, fmt);
+    error1(ERROR_ERROR, fmt, ap);
+    exit(1);
+}
+#define _tcc_error use_tcc_error_noabort
+
 PUB_FUNC void _tcc_warning(const char *fmt, ...)
 {
     va_list ap;
-    
-    /* 19/6/2026 - TRDOS 386: Uyarý Kancasý */
-    trdos_print("\n[* TCC_WARNING *] Derleyici Uyarisi:\n");
-    trdos_print("-> Format Metni: %s\n", fmt);
-
     va_start(ap, fmt);
     error1(ERROR_WARN, fmt, ap);
     va_end(ap);
@@ -822,25 +801,12 @@ static int tcc_compile(TCCState *s1, int filetype, const char *str, int fd, cons
        variables, which may or may not have advantages */
 
     tcc_enter_state(s1);
+    s1->error_set_jmp_enabled = 1;
 
-/* 18/6/2026 - TRDOS 386: setjmp Kara Delik Bypass Hamlesi - Google AI */
-
-    // s1->error_set_jmp_enabled = 1;
-
-    trdos_print("-> [tcc_compile] setjmp mekanizmasi guvenlik amaciyla bypass ediliyor...\n");
-
-    s1->error_set_jmp_enabled = 0; /* 1 yerine 0 yaparak hata atlama modunu kapatýyoruz */
-
-    // if (setjmp(s1->error_jmp_buf) == 0) { /* setjmp cagrisini geçici olarak yorum satýrýna alýyoruz */
-    {
-
-        trdos_print("-> [tcc_compile] setjmp bypass basarili! Derleme katmanlarina giriliyor.\n");
+    if (setjmp(s1->error_jmp_buf) == 0) {
 
         if (fd == -1) {
             int len = strlen(str);
-
-            trdos_print("-> [tcc_compile] Bellekten (string) okuma modunda: tcc_open_bf...\n");
-
             tcc_open_bf(s1, filename ? filename : "<string>", len);
             memcpy(file->buffer, str, len);
 	    if (s1->do_debug && filename) {
@@ -852,47 +818,25 @@ static int tcc_compile(TCCState *s1, int filetype, const char *str, int fd, cons
 		}
 	    }
         } else {
-            trdos_print("-> [tcc_compile] Diskten (fd=%d) okuma modunda: tcc_open_bf...\n", fd);
-
             tcc_open_bf(s1, str, 0);
             file->fd = fd;
         }
 
-        trdos_print("-> [tcc_compile] preprocess_start tetikleniyor...\n");
-
         preprocess_start(s1, filetype);
-
-        trdos_print("-> [tcc_compile] tccgen_init tetikleniyor...\n");
-
         tccgen_init(s1);
 
         if (s1->output_type == TCC_OUTPUT_PREPROCESS) {
-
-            trdos_print("-> [tcc_compile] Sadece Ön Ýþlemci (Preprocess) modu aktif.\n");
-
             tcc_preprocess(s1);
         } else {
-
-            trdos_print("-> [tcc_compile] Gercek kod uretim hattý: tccelf_begin_file...\n");
-
             tccelf_begin_file(s1);
             if (filetype & (AFF_TYPE_ASM | AFF_TYPE_ASMPP)) {
                 tcc_assemble(s1, !!(filetype & AFF_TYPE_ASMPP));
             } else {
-
-                trdos_print("-> [tcc_compile] GOZLERiNiZi AYIRMAYIN! Gercek Derleyici Motoru (tccgen_compile) baslatiliyor...\n");
-
                 tccgen_compile(s1);
             }
-
-            trdos_print("-> [tcc_compile] tccelf_end_file tetikleniyor...\n");
-
             tccelf_end_file(s1);
         }
     }
-
-    trdos_print("-> [tcc_compile] Derleme bitti, temizlik asamasi (tccgen_finish)...\n");
-
     tccgen_finish(s1);
     preprocess_end(s1);
     s1->error_set_jmp_enabled = 0;
@@ -1272,7 +1216,10 @@ static int guess_filetype(const char *filename)
     return filetype;
 }
 
-/* 18/6/2026 - Google AI - Debug */
+/* 18/8/2026 - Google AI - Debug */
+extern int trdos_print(const char *format, ...);
+
+#define printf trdos_print
 
 ST_FUNC int tcc_add_file_internal(TCCState *s1, const char *filename, int flags)
 {

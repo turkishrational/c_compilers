@@ -28,11 +28,68 @@
 #endif
 #include "tcctools.c"
 
-/* 18/6/2026 - Google AI */
-// extern int trdos_print(const char *format, ...);
-// #define printf trdos_print
-
-static const char help[] = "TCC TRDOS 386 HELP TEST\n";
+static const char help[] =
+    "Tiny C Compiler "TCC_VERSION" - Copyright (C) 2001-2006 Fabrice Bellard\n"
+    "Usage: tcc [options...] [-o outfile] [-c] infile(s)...\n"
+    "       tcc [options...] -run infile (or --) [arguments...]\n"
+    "General options:\n"
+    "  -c           compile only - generate an object file\n"
+    "  -o outfile   set output filename\n"
+    "  -run         run compiled source [with custom stdin: -rstdin FILE]\n"
+    "  -fflag       set or reset (with 'no-' prefix) 'flag' (see tcc -hh)\n"
+    "  -Wwarning    set or reset (with 'no-' prefix) 'warning' (see tcc -hh)\n"
+    "  -w           disable all warnings\n"
+    "  -v --version show version\n"
+    "  -vv          show search paths or loaded files\n"
+    "  -h -hh       show this, show more help\n"
+    "  -bench       show compilation statistics\n"
+    "  -            use stdin pipe as infile\n"
+    "  @listfile    read arguments from listfile\n"
+    "Preprocessor options:\n"
+    "  -Idir        add include path 'dir'\n"
+    "  -Dsym[=val]  define 'sym' with value 'val'\n"
+    "  -Usym        undefine 'sym'\n"
+    "  -E           preprocess only\n"
+    "  -nostdinc    do not use standard system include paths\n"
+    "Linker options:\n"
+    "  -Ldir        add library path 'dir'\n"
+    "  -llib        link with dynamic or static library 'lib'\n"
+    "  -nostdlib    do not link with standard crt and libraries\n"
+    "  -r           generate (relocatable) object file\n"
+    "  -rdynamic    export all global symbols to dynamic linker\n"
+    "  -shared      generate a shared library/dll\n"
+    "  -soname      set name for shared library to be used at runtime\n"
+    "  -Wl,-opt[=val]  set linker option (see tcc -hh)\n"
+    "Debugger options:\n"
+    "  -g           generate stab runtime debug info\n"
+    "  -gdwarf[-x]  generate dwarf runtime debug info\n"
+#ifdef TCC_TARGET_PE
+    "  -g.pdb       create .pdb debug database\n"
+#endif
+#ifdef CONFIG_TCC_BCHECK
+    "  -b           compile with built-in memory and bounds checker (implies -g)\n"
+#endif
+#ifdef CONFIG_TCC_BACKTRACE
+    "  -bt[N]       link with backtrace (stack dump) support [show max N callers]\n"
+#endif
+    "Misc. options:\n"
+    "  -std=version define __STDC_VERSION__ according to version (c11/gnu11)\n"
+    "  -x[c|a|b|n]  specify type of the next infile (C,ASM,BIN,NONE)\n"
+    "  -Bdir        set tcc's private include/library dir\n"
+    "  -M[M]D       generate make dependency file [ignore system files]\n"
+    "  -M[M]        as above but no other output\n"
+    "  -MF file     specify dependency file name\n"
+#if defined(TCC_TARGET_I386) || defined(TCC_TARGET_X86_64)
+    "  -m32/64      defer to i386/x86_64 cross compiler\n"
+#endif
+    "Tools:\n"
+    "  create library  : tcc -ar [crstvx] lib [files]\n"
+#ifdef TCC_TARGET_PE
+    "  create def file : tcc -impdef lib.dll [-v] [-o lib.def]\n"
+#endif
+    "Discussion & bug reports:\n"
+    "  https://lists.nongnu.org/mailman/listinfo/tinycc-devel\n"
+    ;
 
 static const char help2[] =
     "Tiny C Compiler "TCC_VERSION" - More Options\n"
@@ -276,20 +333,7 @@ redo:
         write(1, "DEBUG_3: tcc_parse_args() success!\r\n", 36);
     }
     #endif
-
     /* =========================================================================== */
-
-    /* -----------------------------------------------------------------------
-       DEBUG_4 INJECTION: Inspect return values right after parsing
-       ----------------------------------------------------------------------- */
-    #ifdef TCC_TARGET_I386
-    {
-        extern int write(int fd, const void *buf, unsigned int count);
-        /* tcc_parse_args sonrasý kritik deðiþkenlerin durumunu görmek istiyoruz */
-        /* Eðer el yapýmý hex debugger'ýnýz buraya aðýr gelirse düz text basalým: */
-        write(1, "DEBUG_4: Checking opt and inner error boundaries...\r\n", 53);
-    }
-    #endif
 
     if (n == 0) {
         ret = 0;
@@ -317,28 +361,12 @@ redo:
             print_search_dirs(s);
         }
         if (opt) {
-
-            #ifdef TCC_TARGET_I386
-            {
-                extern int write(int fd, const void *buf, unsigned int count);
-                write(1, "TRDOS_TRACE: Forced exit due to (opt != 0) condition!\r\n", 55);
-            }
-            #endif
-
             if (opt < 0) err:
                 ret = 1;
             tcc_delete(s);
             return ret;
         }
         if (s->nb_files == 0) {
-
-            #ifdef TCC_TARGET_I386
-            {
-                extern int write(int fd, const void *buf, unsigned int count);
-                write(1, "TRDOS_TRACE: Forced exit due to (nb_files == 0)!\r\n", 50);
-            }
-            #endif
-
             tcc_error_noabort("no input files");
         } else if (s->output_type == TCC_OUTPUT_PREPROCESS) {
             if (s->outfile && 0!=strcmp("-",s->outfile)) {
@@ -352,35 +380,13 @@ redo:
             else if (s->nb_files > 1 && s->outfile)
                 tcc_error_noabort("cannot specify output file with -c many files");
         }
-        if (s->nb_errors) {
-            #ifdef TCC_TARGET_I386
-            {
-                extern int write(int fd, const void *buf, unsigned int count);
-                write(1, "TRDOS_TRACE: Forced exit due to (nb_errors != 0)!\r\n", 51);
-            }
-            #endif
+        if (s->nb_errors)
             goto err;
-        }  
         if (s->do_bench)
-           start_time = getclock_ms();
+            start_time = getclock_ms();
     }
 
-    /* -----------------------------------------------------------------------
-       DEBUG_5 INJECTION: Real compilation loop milestone reached!
-       ----------------------------------------------------------------------- */
-    #ifdef TCC_TARGET_I386
-    {
-        extern int write(int fd, const void *buf, unsigned int count);
-        write(1, "DEBUG_5: SUCCESS! Entering core compiler state engine!\r\n", 56);
-    }
-    #endif
-
-    // set_environment(s);
-
-    /* 18/6/2026 - Google AI */
-    trdos_print("\n>>> TRDOS 386: DEBUG_5 Gecildi. getenv bypass edildi! <<<\n");
-    trdos_print(">>> Dosya akis dongusune giriliyor: tcc_add_file tetiklenecek. <<<\n");
-
+    set_environment(s);
     if (s->output_type == 0)
         s->output_type = TCC_OUTPUT_EXE;
     tcc_set_output_type(s, s->output_type);
@@ -401,29 +407,15 @@ redo:
     do {
         struct filespec *f = s->files[n];
         s->filetype = f->type;
-         /* 18/6/2026 - TRDOS 386 Dosya Giris Ýzleme Noktasý */
-        trdos_print("\n[LOOP] n=%d, nb_files=%d, Dosya Adi: '%s', Tip: 0x%X\n", n, s->nb_files, f->name, f->type);
-
         if (f->type & AFF_TYPE_LIB) {
-            trdos_print("-> tcc_add_library cagriliyor...\n");
             ret = tcc_add_library(s, f->name);
-            trdos_print("-> tcc_add_library donus kodu (ret): %d\n", ret);
         } else {
             if (1 == s->verbose)
-                trdos_print("-> %s\n", f->name); /* printf yerine trdos_print garantisi */
+                printf("-> %s\n", f->name);
             if (!first_file)
                 first_file = f->name;
-            
-            trdos_print("-> tcc_add_file cagriliyor...\n");
             ret = tcc_add_file(s, f->name);
-            trdos_print("-> tcc_add_file donus kodu (ret): %d\n", ret);
         }
-
-        /* Eger dosya ekleme basarýsýz olduysa nedenini gorelim */
-        if (ret != 0) {
-            trdos_print("[HATA] Dosya ekleme dongusu kesildi! s->nb_errors: %d\n", s->nb_errors);
-        }
-        
     } while (++n < s->nb_files
             && 0 == ret
             && (s->output_type != TCC_OUTPUT_OBJ || s->option_r));
