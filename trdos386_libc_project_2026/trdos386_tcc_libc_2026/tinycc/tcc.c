@@ -28,6 +28,10 @@
 #endif
 #include "tcctools.c"
 
+/* 18/6/2026 - Google AI */
+extern int trdos_print(const char *format, ...);
+#define printf trdos_print
+
 static const char help[] = "TCC TRDOS 386 HELP TEST\n";
 
 static const char help2[] =
@@ -371,7 +375,13 @@ redo:
     }
     #endif
 
-    set_environment(s);
+    // set_environment(s);
+
+    /* 18/6/2026 - Google AI */
+    trdos_print("\n>>> TRDOS 386: DEBUG_5 Gecildi. getenv bypass edildi! <<<\n");
+    
+trdos_print(">>> Dosya akis döngüsüne giriliyor: tcc_add_file tetiklenecek. <<<\n");
+
     if (s->output_type == 0)
         s->output_type = TCC_OUTPUT_EXE;
     tcc_set_output_type(s, s->output_type);
