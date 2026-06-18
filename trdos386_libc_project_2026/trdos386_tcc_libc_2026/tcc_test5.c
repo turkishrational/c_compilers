@@ -29,8 +29,8 @@
 #include "tcctools.c"
 
 /* 18/6/2026 - Google AI */
-// extern int trdos_print(const char *format, ...);
-// #define printf trdos_print
+extern int trdos_print(const char *format, ...);
+#define printf trdos_print
 
 static const char help[] = "TCC TRDOS 386 HELP TEST\n";
 
@@ -379,7 +379,8 @@ redo:
 
     /* 18/6/2026 - Google AI */
     trdos_print("\n>>> TRDOS 386: DEBUG_5 Gecildi. getenv bypass edildi! <<<\n");
-    trdos_print(">>> Dosya akis dongusune giriliyor: tcc_add_file tetiklenecek. <<<\n");
+    
+trdos_print(">>> Dosya akis döngüsüne giriliyor: tcc_add_file tetiklenecek. <<<\n");
 
     if (s->output_type == 0)
         s->output_type = TCC_OUTPUT_EXE;
@@ -401,29 +402,15 @@ redo:
     do {
         struct filespec *f = s->files[n];
         s->filetype = f->type;
-         /* 18/6/2026 - TRDOS 386 Dosya Giris Ýzleme Noktasý */
-        trdos_print("\n[LOOP] n=%d, nb_files=%d, Dosya Adi: '%s', Tip: 0x%X\n", n, s->nb_files, f->name, f->type);
-
         if (f->type & AFF_TYPE_LIB) {
-            trdos_print("-> tcc_add_library cagriliyor...\n");
             ret = tcc_add_library(s, f->name);
-            trdos_print("-> tcc_add_library donus kodu (ret): %d\n", ret);
         } else {
             if (1 == s->verbose)
-                trdos_print("-> %s\n", f->name); /* printf yerine trdos_print garantisi */
+                printf("-> %s\n", f->name);
             if (!first_file)
                 first_file = f->name;
-            
-            trdos_print("-> tcc_add_file cagriliyor...\n");
             ret = tcc_add_file(s, f->name);
-            trdos_print("-> tcc_add_file donus kodu (ret): %d\n", ret);
         }
-
-        /* Eger dosya ekleme basarýsýz olduysa nedenini gorelim */
-        if (ret != 0) {
-            trdos_print("[HATA] Dosya ekleme dongusu kesildi! s->nb_errors: %d\n", s->nb_errors);
-        }
-        
     } while (++n < s->nb_files
             && 0 == ret
             && (s->output_type != TCC_OUTPUT_OBJ || s->option_r));
