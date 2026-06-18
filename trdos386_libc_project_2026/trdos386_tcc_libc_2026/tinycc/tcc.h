@@ -28,6 +28,57 @@
 #include <stdarg.h>
 #include <stdlib.h>
 #include <stdio.h>
+
+/* 16/6/2026 - Google AI */
+/* ===========================================================================
+   TRDOS 386 Port - Standard Stream Override Macro Layer (No Warnings)
+   =========================================================================== */
+#ifdef TCC_TARGET_I386
+    /* Force the compiler to resolve stdout/stderr as a flat 4-byte pointer array */
+    /* This completely bypasses the 32-byte MinGW struct offset alignment (+32/+64) */
+    #undef stdout
+    #undef stderr
+    #undef stdin
+
+    /* 1. Map stdout/stderr to our flat 4-byte DWORD pointer array elements in libc_core */
+    #define stdin  ((FILE*)(_iob))
+    #define stdout ((FILE*)((char*)(_iob) + 4))
+    #define stderr ((FILE*)((char*)(_iob) + 8))
+
+    /* 2. Override MinGW's exit() to directly invoke TRDOS 386 native sys_exit */
+
+    /* This completely bypasses Win32 hang/cleanup loops inside TCCState errors */
+/*   #undef exit
+  #define exit(status) __asm__ __volatile__("movl %0, %%ebx\n\t" "movl $1, %%eax\n\t" "int $0x40\n\t" : : "r"(status) : "eax", "ebx") */
+
+/* ===========================================================================
+   TRDOS 386 Port - Defensively Patched exit() Macro for Deep Trace Debugging
+   =========================================================================== */
+    #undef exit
+    
+    /* This macro will intercept ANY call to exit() inside libtcc.c / tcc_new() */
+    /* It writes a clear trace message on the screen using sysmsg (EAX=35) right before sys_exit */
+    #define exit(status) do { \
+        static char exit_dbg[] = "\r\nTRDOS_TRACE: exit() was forced inside tcc_new/internals!\r\n"; \
+        __asm__ __volatile__ ( \
+            "movl %0, %%ebx\n\t"   /* EBX = Message pointer address */ \
+            "movl $57, %%ecx\n\t"  /* ECX = Message length (57 bytes) */ \
+            "movb $0x0C, %%dl\n\t" /* DL  = Light Red color attribute */ \
+            "movl $35, %%eax\n\t"  /* EAX = 35 (sysmsg) */ \
+            "int $0x40\n\t"        /* Print the warning message */ \
+            \
+            "movl %1, %%ebx\n\t"   /* EBX = exit status code */ \
+            "movl $1, %%eax\n\t"   /* EAX = 1 (sys_exit) */ \
+            "int $0x40\n\t"        /* Terminate the process via TRDOS kernel */ \
+            : \
+            : "g" (exit_dbg), "r" (status) \
+            : "eax", "ebx", "ecx", "edx" \
+        ); \
+    } while(0)
+
+#endif
+/* =========================================================================== */
+
 /* gnu headers use to #define __attribute__ to empty for non-gcc compilers */
 #ifdef __TINYC__
 # undef __attribute__
