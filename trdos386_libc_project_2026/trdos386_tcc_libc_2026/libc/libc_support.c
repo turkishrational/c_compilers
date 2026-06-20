@@ -21,19 +21,6 @@ int unlink(const char *filename) { return 0; }
 void qsort(void *base, unsigned int nitems, unsigned int size, int (*compar)(const void *, const void *)) {}
 void *fdopen(int handle, const char *mode) { return (void*)handle; }
 
-int _snprintf(char *buffer, unsigned int count, const char *format, ...) {
-    char *p = (char*)format;
-    unsigned int i = 0;
-    if (count == 0) return 0;
-    while(*p && i < count - 1) { buffer[i++] = *p++; }
-    buffer[i] = '\0';
-    return i;
-}
-int _vsnprintf(char *buffer, unsigned int count, const char *format, void *argptr) { return _snprintf(buffer, count, format); }
-int __mingw_vfprintf(void *stream, const char *format, void *argptr) { return 0; }
-int __mingw_vprintf(const char *format, void *argptr) { return 0; }
-int __mingw_vsprintf(char *buffer, const char *format, void *argptr) { return _snprintf(buffer, 4096, format); }
-
 int _errno = 0;
 char *strerror(int errnum) { return "TRDOS LIBC Error"; }
 long long time(long long *tloc) { return 0; }
