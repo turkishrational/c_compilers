@@ -238,58 +238,53 @@ int main(int argc, char **argv)
     char **argv0 = argv;
     FILE *ppfp = stdout;
 
+/* =================================================================== */
+/* TRDOS 386 - DIRECT _SPRINT ISOLATION DEBUG BLOCK (FIXED LINK)       */
+/* =================================================================== */
+{
+    /* Flat binary virtual memory üzerinde izole bir test tamponu açýyoruz */
+    static char debug_buffer[256]; /* Flat binary için static veya array tabaný */
+    int test_version_major = 0;
+    int test_version_minor = 9;
+    int test_version_patch = 28;
+    unsigned int test_hex_val = 0xABCDE123;
+    
+    /* GCC'nin otomatik alt çizgi dekorasyonunu bypass eden __asm__ zýrhý */
+    extern int safe_sprint_engine(char *buf, const char *fmt, void *args) __asm__("_sprint");
+    
+    /* C calling convention gereði argümanlarý yýðýn düzenine sokuyoruz */
+    struct {
+        int maj;
+        int min;
+        int pat;
+        unsigned int hx;
+    } test_args;
+    
+    test_args.maj = test_version_major;
+    test_args.min = test_version_minor;
+    test_args.pat = test_version_patch;
+    test_args.hx  = test_hex_val;
+
+    /* Tamponu çöp verilerden korumak için temizliyoruz */
+    for(int b = 0; b < 256; b++) debug_buffer[b] = 0;
+
+    /* _sprint motorunu doðrudan gerçek sembol adýyla tetikliyoruz */
+    safe_sprint_engine(debug_buffer, "Tiny C Compiler Version %d.%d.%d for TRDOS 386 (HEX: %X)\n", &test_args);
+
+    /* Sonucu formatsýz, saf ve düz metin olarak ekrana basýyoruz */
+    trdos_print("%s", debug_buffer);
+}
+/* =================================================================== */
+/* END OF DEBUG BLOCK                                                  */
+/* =================================================================== */
+/* =================================================================== */
+
 redo:
     argc = argc0, argv = argv0;
 
-    /* =========================================================================== */
-    
-    /* -----------------------------------------------------------------------
-       DEBUG 1: Check if main successfully reaches before tcc_new()
-       ----------------------------------------------------------------------- */
-    #ifdef TCC_TARGET_I386
-    {
-        extern int write(int fd, const void *buf, unsigned int count);
-        write(1, "DEBUG_1: Calling tcc_new()...\r\n", 31);
-    }
-    #endif
-
     s = s1 = tcc_new();
 
-    /* -----------------------------------------------------------------------
-       DEBUG 2: Check if tcc_new() returns successfully
-       ----------------------------------------------------------------------- */
-    #ifdef TCC_TARGET_I386
-    {
-        extern int write(int fd, const void *buf, unsigned int count);
-        write(1, "DEBUG_2: tcc_new() success! Calling tcc_parse_args()...\r\n", 57);
-    }
-    #endif
-
     opt = tcc_parse_args(s, &argc, &argv);
-
-    /* -----------------------------------------------------------------------
-       DEBUG 3: Check if tcc_parse_args() returns successfully
-       ----------------------------------------------------------------------- */
-    #ifdef TCC_TARGET_I386
-    {
-        extern int write(int fd, const void *buf, unsigned int count);
-        write(1, "DEBUG_3: tcc_parse_args() success!\r\n", 36);
-    }
-    #endif
-
-    /* =========================================================================== */
-
-    /* -----------------------------------------------------------------------
-       DEBUG_4 INJECTION: Inspect return values right after parsing
-       ----------------------------------------------------------------------- */
-    #ifdef TCC_TARGET_I386
-    {
-        extern int write(int fd, const void *buf, unsigned int count);
-        /* tcc_parse_args sonrasý kritik deðiþkenlerin durumunu görmek istiyoruz */
-        /* Eðer el yapýmý hex debugger'ýnýz buraya aðýr gelirse düz text basalým: */
-        write(1, "DEBUG_4: Checking opt and inner error boundaries...\r\n", 53);
-    }
-    #endif
 
     if (n == 0) {
         ret = 0;
@@ -365,21 +360,7 @@ redo:
            start_time = getclock_ms();
     }
 
-    /* -----------------------------------------------------------------------
-       DEBUG_5 INJECTION: Real compilation loop milestone reached!
-       ----------------------------------------------------------------------- */
-    #ifdef TCC_TARGET_I386
-    {
-        extern int write(int fd, const void *buf, unsigned int count);
-        write(1, "DEBUG_5: SUCCESS! Entering core compiler state engine!\r\n", 56);
-    }
-    #endif
-
     // set_environment(s);
-
-    /* 18/6/2026 - Google AI */
-    trdos_print("\n>>> TRDOS 386: DEBUG_5 Gecildi. getenv bypass edildi! <<<\n");
-    trdos_print(">>> Dosya akis dongusune giriliyor: tcc_add_file tetiklenecek. <<<\n");
 
     if (s->output_type == 0)
         s->output_type = TCC_OUTPUT_EXE;
@@ -401,11 +382,10 @@ redo:
     do {
         struct filespec *f = s->files[n];
         s->filetype = f->type;
-         /* 18/6/2026 - TRDOS 386 Dosya Giris Ýzleme Noktasý */
+        /* 18/6/2026 - TRDOS 386 Dosya Giris Ýzleme Noktasý */
         trdos_print("\n[LOOP] n=%d, nb_files=%d, Dosya Adi: '%s', Tip: 0x%X\n", n, s->nb_files, f->name, f->type);
 
         if (f->type & AFF_TYPE_LIB) {
-            trdos_print("-> tcc_add_library cagriliyor...\n");
             ret = tcc_add_library(s, f->name);
             trdos_print("-> tcc_add_library donus kodu (ret): %d\n", ret);
         } else {
@@ -414,7 +394,6 @@ redo:
             if (!first_file)
                 first_file = f->name;
             
-            trdos_print("-> tcc_add_file cagriliyor...\n");
             ret = tcc_add_file(s, f->name);
             trdos_print("-> tcc_add_file donus kodu (ret): %d\n", ret);
         }

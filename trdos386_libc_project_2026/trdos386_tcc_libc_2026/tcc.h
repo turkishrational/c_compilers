@@ -56,24 +56,7 @@
    =========================================================================== */
     #undef exit
     
-    /* This macro will intercept ANY call to exit() inside libtcc.c / tcc_new() */
-    /* It writes a clear trace message on the screen using sysmsg (EAX=35) right before sys_exit */
     #define exit(status) do { \
-        static char exit_dbg[] = "\r\nTRDOS_TRACE: exit() was forced inside tcc_new/internals!\r\n"; \
-        __asm__ __volatile__ ( \
-            "movl %0, %%ebx\n\t"   /* EBX = Message pointer address */ \
-            "movl $57, %%ecx\n\t"  /* ECX = Message length (57 bytes) */ \
-            "movb $0x0C, %%dl\n\t" /* DL  = Light Red color attribute */ \
-            "movl $35, %%eax\n\t"  /* EAX = 35 (sysmsg) */ \
-            "int $0x40\n\t"        /* Print the warning message */ \
-            : \
-            : "g" (exit_dbg) \
-            : "eax", "ebx", "ecx", "edx" \
-        ); \
-        \
-        /* 19/6/2026 - Çýkýþ kodunu (status) ekrana basarak hatanýn türünü anlýyoruz */ \
-        trdos_print("-> TRDOS_TRACE: Exit Status (Hata Kodu): %d\n", (status)); \
-        \
         __asm__ __volatile__ ( \
             "movl %0, %%ebx\n\t"   /* EBX = exit status code */ \
             "movl $1, %%eax\n\t"   /* EAX = 1 (sys_exit) */ \

@@ -827,14 +827,10 @@ static int tcc_compile(TCCState *s1, int filetype, const char *str, int fd, cons
 
     // s1->error_set_jmp_enabled = 1;
 
-    trdos_print("-> [tcc_compile] setjmp mekanizmasi guvenlik amaciyla bypass ediliyor...\n");
-
     s1->error_set_jmp_enabled = 0; /* 1 yerine 0 yaparak hata atlama modunu kapatýyoruz */
 
     // if (setjmp(s1->error_jmp_buf) == 0) { /* setjmp cagrisini geçici olarak yorum satýrýna alýyoruz */
     {
-
-        trdos_print("-> [tcc_compile] setjmp bypass basarili! Derleme katmanlarina giriliyor.\n");
 
         if (fd == -1) {
             int len = strlen(str);
@@ -858,11 +854,7 @@ static int tcc_compile(TCCState *s1, int filetype, const char *str, int fd, cons
             file->fd = fd;
         }
 
-        trdos_print("-> [tcc_compile] preprocess_start tetikleniyor...\n");
-
         preprocess_start(s1, filetype);
-
-        trdos_print("-> [tcc_compile] tccgen_init tetikleniyor...\n");
 
         tccgen_init(s1);
 
@@ -880,7 +872,7 @@ static int tcc_compile(TCCState *s1, int filetype, const char *str, int fd, cons
                 tcc_assemble(s1, !!(filetype & AFF_TYPE_ASMPP));
             } else {
 
-                trdos_print("-> [tcc_compile] GOZLERiNiZi AYIRMAYIN! Gercek Derleyici Motoru (tccgen_compile) baslatiliyor...\n");
+                trdos_print("-> [tcc_compile] Gercek Derleyici Motoru (tccgen_compile) baslatiliyor...\n");
 
                 tccgen_compile(s1);
             }
@@ -1304,15 +1296,11 @@ ST_FUNC int tcc_add_file_internal(TCCState *s1, const char *filename, int flags)
     }
 
     if (flags & AFF_TYPE_BIN) {
-        trdos_print("-> [tcc_add_file_internal] tcc_add_binary tetikleniyor...\n");
         return tcc_add_binary(s1, flags, filename, fd);
     }
 
-    trdos_print("-> [tcc_add_file_internal] dynarray_add (deps) yaklasiyor...\n");
     dynarray_add(&s1->target_deps, &s1->nb_target_deps, tcc_strdup(filename));
-    trdos_print("-> [tcc_add_file_internal] dynarray_add basariyla gecildi!\n");
 
-    trdos_print("-> [tcc_add_file_internal] tcc_compile tetikleniyor! (fd=%d)\n", fd);
     return tcc_compile(s1, flags, filename, fd, NULL);
 }
 
