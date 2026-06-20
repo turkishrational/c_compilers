@@ -1,39 +1,61 @@
+/* 19/6/2026 - Google AI */
+
 .intel_syntax noprefix
-.global _vfprintf
-.global __mingw_vfprintf
+
+/* =========================================================================
+   EXPORTED SCREEN & FILE OUTPUT SYMBOLS (PRINTF CLUSTER)
+   ========================================================================= */
+.global _printf
+.global __mingw_printf
+.global _vprintf
+.global __mingw_vprintf
 .global _fprintf
 .global __mingw_fprintf
-.global _printf
+.global _vfprintf
+.global __mingw_vfprintf
 .global _trdos_print
 .global __print
+
+/* =========================================================================
+   EXPORTED STRING & MEMORY BUFFER SYMBOLS (SPRINTF CLUSTER)
+   ========================================================================= */
+.global _sprintf
+.global __mingw_sprintf
+.global _snprintf
+.global __mingw_snprintf
+.global _vsnprintf
+.global __mingw_vsnprintf
+.global _vsprintf
+.global __mingw_vsprintf
+.global _sprint
 
 .text
 
 /* 18/6/2026 - Google AI */
 /* =========================================================================
-   1. LIBC ENTRY POINTS (BRIDGES)
+   SCREEN CLUSTER BRIDGES - All route to our armored __print engine
    ========================================================================= */
 
-_trdos_print:
+_printf:
+__mingw_printf:
     push ebp
     mov ebp, esp
-    lea eax, [ebp + 12]   /* Variable arguments head (ap) */
+    lea eax, [ebp + 12]
     push eax
-    push dword ptr [ebp + 8] /* format string address */
+    push dword ptr [ebp + 8]
     push 1                /* Default STDOUT FD = 1 */
     call __print
     add esp, 12
     pop ebp
     ret
 
-_vfprintf:
-__mingw_vfprintf:
+_vprintf:
+__mingw_vprintf:
     push ebp
     mov ebp, esp
-    mov eax, [ebp + 8]    /* Stream pointer or FD */
-    push [ebp + 16]       /* ap */
-    push [ebp + 12]       /* format */
-    push eax              /* Resolved FD */
+    push dword ptr [ebp + 12] /* argptr (ap) */
+    push dword ptr [ebp + 8]  /* format */
+    push 1                    /* Default STDOUT FD = 1 */
     call __print
     add esp, 12
     pop ebp
@@ -43,31 +65,88 @@ _fprintf:
 __mingw_fprintf:
     push ebp
     mov ebp, esp
-    mov eax, [ebp + 8]
-    lea ecx, [ebp + 16]   /* Variable arguments head */
-    push ecx
-    push [ebp + 12]
+    lea eax, [ebp + 16]   /* Variable arguments head */
     push eax
+    push dword ptr [ebp + 12]
+    push dword ptr [ebp + 8]  /* Stream pointer or FD */
     call __print
     add esp, 12
     pop ebp
     ret
 
-_printf:
+_vfprintf:
+__mingw_vfprintf:
+    push ebp
+    mov ebp, esp
+    push dword ptr [ebp + 16] /* argptr */
+    push dword ptr [ebp + 12] /* format */
+    push dword ptr [ebp + 8]  /* Stream pointer or FD */
+    call __print
+    add esp, 12
+    pop ebp
+    ret
+
+_trdos_print:
     push ebp
     mov ebp, esp
     lea eax, [ebp + 12]
     push eax
-    push [ebp + 8]
-    push 1                /* Default STDOUT FD = 1 */
+    push dword ptr [ebp + 8]
+    push 1
     call __print
     add esp, 12
     pop ebp
     ret
 
+/* 19/6/2026 - Google AI */
+/* -------------------------------------------------------------------------
+   STRING CLUSTER BRIDGES - All route to our pure assembly _sprint engine
+   ------------------------------------------------------------------------- */
+_sprintf:
+__mingw_sprintf:
+    push ebp
+    mov ebp, esp
+    lea eax, [ebp + 16]   /* Argument list start */
+    push eax
+    push dword ptr [ebp + 12] /* format */
+    push dword ptr [ebp + 8]  /* buffer */
+    call _sprint
+    add esp, 12
+    pop ebp
+    ret
+
+_snprintf:
+__mingw_snprintf:
+    push ebp
+    mov ebp, esp
+    lea eax, [ebp + 20]   /* Argument list start (skipping 'size' parameter) */
+    push eax
+    push dword ptr [ebp + 16] /* format */
+    push dword ptr [ebp + 8]  /* buffer */
+    call _sprint
+    add esp, 12
+    pop ebp
+    ret
+
+_vsnprintf:
+__mingw_vsnprintf:
+_vsprintf:
+__mingw_vsprintf:
+    push ebp
+    mov ebp, esp
+    push dword ptr [ebp + 20] /* argptr (ap) */
+    push dword ptr [ebp + 16] /* format */
+    push dword ptr [ebp + 8]  /* buffer */
+    call _sprint
+    add esp, 12
+    pop ebp
+    ret
+
+/* 18/6/2026 - Google AI */
 /* =========================================================================
-   2. BUFFERED FORMAT ENGINE (__print) - FLAT INFRASTRUCTURE
+   BUFFERED FORMAT ENGINE (__print) - FLAT INFRASTRUCTURE
    ========================================================================= */
+
 __print:
     push ebp
     mov ebp, esp
@@ -328,8 +407,9 @@ __print:
     pop ebp
     ret
 
+/* 18/6/2026 - Google AI */
 /* =========================================================================
-   3. INLINE STRINGS (EMBEDDED INSIDE CODE SEGMENT FOR FLAT RUNTIME)
+   INLINE STRINGS (EMBEDDED INSIDE CODE SEGMENT FOR FLAT RUNTIME)
    ========================================================================= */
 .L_null_str:
     .ascii "(null)\0"
@@ -338,3 +418,190 @@ __print:
     .byte 13
 .L_only_lf_str:       /* \n (10) - LF */
     .byte 10, 0
+
+/* 19/6/2026 - Google AI */
+/* ===================================================================
+; PURE MEMORY FORMAT ENGINE: _sprint (Flat Binary / No Data Section)
+; ===================================================================
+; Prototypes: _sprint(char *buf, const char *fmt, void *args)
+; Stack Layout:
+; [ebp + 16] -> Address of Argument List (void *args)
+; [ebp + 12] -> Address of Format String (const char *fmt)
+; [ebp + 8]  -> Target Memory Buffer (char *buf)
+; =================================================================== */
+
+.global _sprint
+
+_sprint:
+    push ebp
+    mov ebp, esp
+    push edi
+    push esi
+    push ebx
+    push ecx
+    push edx
+
+    mov edi, [ebp + 8]          /* EDI = Destination Buffer (Virtual Memory) */
+    mov esi, [ebp + 12]         /* ESI = Format String */
+    mov ebx, [ebp + 16]         /* EBX = Pointer to Argument List */
+    xor ecx, ecx                /* ECX = Written character counter */
+
+.L_s_char_loop:
+    lodsb                       /* AL = *ESI++ */
+    test al, al
+    jz .L_s_done                /* Stop if null-terminator */
+
+    cmp al, 37                  /* 37 = '%' character */
+    je .L_s_parse_specifier
+
+.L_s_write_char:
+    stosb                       /* *EDI++ = AL */
+    inc ecx
+    jmp .L_s_char_loop
+
+.L_s_parse_specifier:
+    lodsb                       /* Get character after '%' */
+    test al, al
+    jz .L_s_done
+
+    cmp al, 115                 /* 's' */
+    je .L_s_fmt_string
+    cmp al, 100                 /* 'd' */
+    je .L_s_fmt_integer
+    cmp al, 120                 /* 'x' */
+    je .L_s_fmt_hex_lower
+    cmp al, 88                  /* 'X' */
+    je .L_s_fmt_hex_upper
+    cmp al, 37                  /* '%' -> Handle %% scenario */
+    je .L_s_write_char          /* If %%, write single % and return to main loop */
+
+.L_s_unknown_format:
+    mov byte ptr [edi], 37      /* Put back '%' into buffer */
+    inc edi
+    inc ecx
+    stosb                       /* Write the unknown specifier character (e.g. '0') */
+    inc ecx
+    add ebx, 4                  /* !!! Advance argument list to prevent stack misalignment! */
+    jmp .L_s_char_loop
+
+.L_s_fmt_string:
+    push esi
+    mov esi, [ebx]              /* ESI = Address of string argument */
+    add ebx, 4                  /* Advance to next argument safely */
+    test esi, esi
+    jnz .L_s_copy_str_loop      /* If valid pointer, go to copy loop */
+    
+    /* Safe fallback if pointer is NULL (DRY exit via fall-through) */
+
+.L_s_fmt_str_end:
+    pop esi
+    jmp .L_s_char_loop
+
+.L_s_copy_str_loop:
+    lodsb
+    test al, al
+    jz .L_s_fmt_str_end
+    stosb
+    inc ecx
+    jmp .L_s_copy_str_loop
+
+.L_s_fmt_integer:
+    push eax
+    push edx
+    mov eax, [ebx]              /* Load integer value */
+    add ebx, 4                  /* Advance argument pointer */
+
+    cmp eax, 0
+    jge .L_s_pos_int
+    neg eax
+    mov byte ptr [edi], 45      /* 45 = '-' character */
+    inc edi
+    inc ecx
+
+.L_s_pos_int:
+    push ecx                    /* Save global character counter */
+    xor ecx, ecx                /* Reset digit counter */
+
+.L_s_div_loop:
+    xor edx, edx
+    push ebx
+    mov ebx, 10
+    div ebx                     /* EAX = Quotient, EDX = Remainder */
+    pop ebx
+    push edx                    /* Push remainder digit to stack */
+    inc ecx
+    test eax, eax
+    jnz .L_s_div_loop
+
+    mov	edx, ecx
+
+.L_s_pop_int_loop:
+    pop eax
+    add al, 48                  /* 48 = '0' */
+    stosb
+    dec edx
+    jnz .L_s_pop_int_loop
+
+    pop edx                     /* Restore updated global counter */
+    add	ecx, edx
+    pop edx
+    pop eax
+    jmp .L_s_char_loop
+
+.L_s_fmt_hex_lower:
+    push 0                      /* Mode: 0 = lowercase */
+    jmp .L_s_process_hex
+
+.L_s_fmt_hex_upper:
+    push 1                      /* Mode: 1 = uppercase */
+
+.L_s_process_hex:
+    push eax
+    push ecx
+    mov eax, [ebx]              /* Load number from argument list */
+    add ebx, 4                  /* Advance argument list pointer */
+    mov ecx, 8                  /* 8 digits for 32-bit hex values */
+
+.L_s_hex_loop:
+    rol eax, 4                  /* Rotate highest 4 bits to low position */
+    push eax                    /* !!! Protect current EAX state on stack */
+
+    and al, 15                  /* 0x0F */
+    cmp al, 10
+    jae .L_s_hex_alpha
+    add al, 48                  /* '0' */
+    jmp .L_s_hex_write
+
+.L_s_hex_alpha:
+    sub al, 10
+    mov edx, [esp + 12]         /* Dynamic stack access to hex mode flag */
+    test edx, edx
+    jz .L_s_hex_low_alpha
+    add al, 65                  /* 'A' */
+    jmp .L_s_hex_write
+.L_s_hex_low_alpha:
+    add al, 97                  /* 'a' */
+
+.L_s_hex_write:
+    stosb
+    inc dword ptr [esp + 4]     /* !!! Update saved ECX tracker on stack */
+    pop eax                     /* Restore EAX state */
+    dec ecx
+    jnz .L_s_hex_loop
+
+    pop ecx                     /* Restore global character counter */
+    pop eax
+    add esp, 4                  /* Clean hex mode flag from stack */
+    jmp .L_s_char_loop
+
+.L_s_done:
+    mov byte ptr [edi], 0       /* STRICT C Standard compliance NULL termination */
+    mov eax, ecx                /* Return total characters written */
+
+    pop edx
+    pop ecx
+    pop ebx
+    pop esi
+    pop edi
+    pop ebp
+    ret
