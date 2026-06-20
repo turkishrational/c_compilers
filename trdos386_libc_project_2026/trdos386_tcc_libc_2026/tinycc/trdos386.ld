@@ -37,4 +37,39 @@ SECTIONS
         *(.note.*)
         *(.head)
     }
+
+/* =================================================================== */
+/* TRDOS 386 LINKER ALIAS ARMOR - PHASE 2                              */
+/* =================================================================== */
+
+PROVIDE(_snprintf = _sprint);
+PROVIDE(__snprintf = _sprint);
+PROVIDE(snprintf = _sprint);
+PROVIDE(___mingw_snprintf = _sprint);
+
+PROVIDE(_vsnprintf = _sprint);
+PROVIDE(__vsnprintf = _sprint);
+PROVIDE(vsnprintf = _sprint);
+PROVIDE(___mingw_vsnprintf = _sprint);
+
+PROVIDE(_vsprintf = _sprint);
+PROVIDE(__vsprintf = _sprint);
+PROVIDE(vsprintf = _sprint);
+PROVIDE(___mingw_vsprintf = _sprint);
+
+PROVIDE(__mingw_vsprintf = _sprint);
+
+PROVIDE(__mingw_vfprintf = __print);
+PROVIDE(__mingw_vprintf = __print);
+
+PROVIDE(__mingw_vfprintf = __print);
+PROVIDE(__mingw_vfprintf = _print);
+PROVIDE(___mingw_vfprintf = __print);
+PROVIDE(___mingw_vfprintf = _print);
+
+PROVIDE(__mingw_vprintf = __print);
+PROVIDE(__mingw_vprintf = _print);
+PROVIDE(___mingw_vprintf = __print);
+PROVIDE(___mingw_vprintf = _print);
+
 }
