@@ -69,13 +69,6 @@
 /* 18/6/2026 - Google AI - Debug */
 extern int trdos_print(const char *format, ...);
 
-/* 21/6/2026 - Google AI - Debug */
-/* libtcc.c - Dosyanýn en üstü, global alan */
-
-const char *trdos_zirh_str = "int main(void) {\n    int a, b, c;\n    a = 10;\n    b = 20;\n    c = a + b;\n    return c;\n}";
-
-int trdos_zirh_len = 87;
-
 #define printf trdos_print
 
 /********************************************************/
@@ -247,71 +240,21 @@ static void tcc_concat_str(char **pp, const char *str, int sep)
 #undef free
 #undef realloc
 
-/* 21/6/2026 - Google AI */
-/* ===========================================================================
-   TRDOS 386 PORT - DYNAMIC ZERO-FILL REALLOCATOR (21/06/2026)
-   =========================================================================== */
-
-#define REALLOC_AREA 0x02800000
-
-/* Sayfa sýnýrýnda (Page Border) hafýzayý uyandýran ve sýfýrlayan montaj motoru */
-static inline void trdos_demand_page_warmup(void *addr, unsigned int dword_count) {
-    __asm__ __volatile__ (
-        "cld\n\t"
-        "rep stosl\n\t"
-        : "+D"(addr), "+c"(dword_count)
-        : "a"(0)
-        : "memory", "cc"
-    );
-}
-
-
 static void *default_reallocator(void *ptr, unsigned long size)
 {
-    static unsigned long current_heap_ptr = REALLOC_AREA;
-    static unsigned long allocated_limit   = REALLOC_AREA;
-    
-    void *new_ptr;
-
-    // tcc_free(ptr) durumu (size == 0)
-    if (size == 0) return NULL;
-
-    // TCC'nin isteklerini DWORD (4-byte) sýnýrýna hizalýyoruz
-    unsigned long aligned_size = (size + 3) & ~3;
-
-    // Yeni adresi belirliyoruz
-    new_ptr = (void*)current_heap_ptr;
-    unsigned long next_heap_ptr = current_heap_ptr + aligned_size;
-
-    // GÜVENLÝK ZIRHI: Eðer yeni istenecek alan mevcut uyandýrýlmýþ sýnýrýmýzý aþýyorsa
-    if (next_heap_ptr > allocated_limit) {
-        // Kaç sayfa (4KB) geniþlememiz gerektiðini hesaplýyoruz
-        unsigned long needed_bytes = next_heap_ptr - allocated_limit;
-        unsigned long page_chunks = (needed_bytes + 4095) / 4096;
-
-        unsigned long check_addr = allocated_limit;
-        for (unsigned long i = 0; i < page_chunks; i++) {
-            // NÝHAÝ TAMÝR: Tüm alaný rep stosl ile sýfýrlayýp TCC'yi þaþýrtmak yerine,
-            // Sadece her 4KB'lýk sayfanýn ÝLK BYTE'ýna dokunarak Demand Paging'i tetikliyoruz!
-            *(volatile char*)check_addr = 0; 
-            check_addr += 4096;
+    void *ptr1;
+    if (size == 0) {
+        free(ptr);
+        ptr1 = NULL;
+    }
+    else {
+        ptr1 = realloc(ptr, size);
+        if (!ptr1) {
+            fprintf(stderr, "memory full\n");
+            exit (1);
         }
-
-        // Uyandýrýlmýþ sayfa tavan sýnýrýmýzý ileri itiyoruz
-        allocated_limit += page_chunks * 4096;
     }
-
-    // Ýþaretçiyi güncelliyoruz
-    current_heap_ptr = next_heap_ptr;
-
-    // Eðer bu bir tcc_realloc (ptr != NULL) çaðrýsý ise eski veriyi güvenle taþýyoruz
-    if (ptr != NULL) {
-        // Eski verinin boyutunu bilmediðimiz için TCC'nin yeni istediði 'size' kadar 
-        // güvenle kopyalýyoruz. Operasyon tamamen 0x02800000 üzerinde döndüðü için risk sýfýrdýr.
-        memcpy(new_ptr, ptr, size);
-    }
-
-    return new_ptr;
+    return ptr1;
 }
 
 ST_FUNC void libc_free(void *ptr)
@@ -762,101 +705,47 @@ LIBTCCAPI void tcc_set_error_func(TCCState *s, void *error_opaque, TCCErrorFunc 
 #undef _tcc_error
 PUB_FUNC void _tcc_error(const char *fmt, ...)
 {
-    /* 22/06/2026 - TRDOS 386: FATAL ERROR HEX EXTRACTION FIXED */
-    // cdecl standardýna göre format string'inin hemen arkasýndaki 
-    // ilk ham argümaný yýðýndan elceðizimizle çekiyoruz:
-    unsigned int raw_char_val = (unsigned int)*((&fmt) + 1);
-
-    /* Hex dönüþümü için flat binary güvenli static bir tampon açýyoruz */
-    static char hex_conversion_buf[32];
-    extern void itoab(unsigned int value, char *str, int base);
-
+    va_list ap;
+    
+    /* 19/6/2026 - TRDOS 386: Ölümcül Hata Kancasý */
     trdos_print("\n[!!! TCC_ERROR !!!] Derleyici Olumcul Hata Yakaladi:\n");
+    trdos_print("-> Format Metni: %s\n", fmt);
 
-    if (fmt != NULL) {
-        trdos_print("-> Hata Detayi: ");
-        trdos_print(fmt); /* "unrecognized character \x%02x" metni */
-        trdos_print("\n");
-        
-        /* =================================================================== */
-        /* TRDOS 386 - NATIVE HEX DISPLAY ARMOR (SHAH-MAT)                     */
-        /* =================================================================== */
-        /* va_list offset kaymasý yüzünden ekrana basýlan o sahte yýðýn        */
-        /* adresini (0xFFBFFFxx) bypass edip, yýðýndan çektiðimiz o saf ilk     */
-        /* deðeri (karakterin ham hex kodunu) _itoab ile açýkça döküyoruz!     */
-        if (fmt[0] == 'u' && fmt[1] == 'n') { /* "unrecognized..." güvenli char kontrolü */
-            
-            /* Tamponu çöp verilerden korumak için sýfýrlýyoruz */
-            for(int i = 0; i < 32; i++) hex_conversion_buf[i] = 0;
-            
-            /* libc_itoa.s içindeki _itoab motorunu doðrudan tetikliyoruz */
-            itoab(raw_char_val, hex_conversion_buf, 16); /* Base 16 = Hexadecimal */
-            
-            trdos_print("-> [TRDOS_ZIRH] Maskelenen Ham Karakter/Deger (HEX): 0x");
-            trdos_print(hex_conversion_buf);
-            trdos_print("\n");
-        }
-        /* =================================================================== */
-    }
-
-    /* TCC'nin orijinal abort/exit zinciri yerine TRDOS yerel exit'i */
-    exit(1); 
+    va_start(ap, fmt);
+    error1(ERROR_ERROR, fmt, ap);
+    va_end(ap);
+    
+    exit(1);
 }
-            
 #define _tcc_error use_tcc_error_noabort
 
 PUB_FUNC int _tcc_error_noabort(const char *fmt, ...)
 {
-    /* 22/06/2026 - TRDOS 386: STACK-EXTRACTION FORMAT ZIRHI (ZERO-DEPENDENCY) */
-    const char *real_arg1 = (const char *)*((&fmt) + 1);
-
-    trdos_print("\n[! TCC_ERROR_NOABORT !] Derleyici Hata Yakaladi (Devam Edilebilir):\n");
-
-    if (fmt != NULL) {
-        trdos_print("-> Hata Detayi: ");
-        trdos_print(fmt); 
-        trdos_print("\n");
-        
-        /* =================================================================== */
-        /* TRDOS 386 - ZERO-DEPENDENCY FORMAT PROTECTION (SHAH-MAT)            */
-        /* =================================================================== */
-        /* strstr baðýmlýlýðýný kaldýrmak için doðrudan karakter kontrolü      */
-        /* yapýyoruz. "unrecognized character" -> 'u' ve 'n' ile baþlar.      */
-        if (fmt[0] == 'u' && fmt[1] == 'n') {
-            trdos_print("-> [TRDOS_ZIRH] Sahte Yigin Sizintisi Boguldu. Derleme Surduruluyor...\n");
-            return -1; /* Derleyiciyi durdurmadan güvenle dön! */
-        }
-        /* =================================================================== */
-    }
+    va_list ap;
     
-    /* Sadece gerçek string adresleri için bu bloku çalýþtýrýyoruz (Örn: file not found) */
-    if (real_arg1 != NULL && ((unsigned int)real_arg1 > 0x10000)) {
-        trdos_print("-> Dosya Adi / Parametre: ");
-        trdos_print(real_arg1); 
-        trdos_print("\n");
-    }
+    /* 19/6/2026 - TRDOS 386: Abort Olmayan Hata Kancasý */
+    trdos_print("\n[! TCC_ERROR_NOABORT !] Derleyici Hata Yakaladi (Devam Edilebilir):\n");
+    trdos_print("-> Format Metni: %s\n", fmt);
 
+    va_start(ap, fmt);
+    error1(ERROR_NOABORT, fmt, ap);
+    va_end(ap);
     return -1;
 }
 
 PUB_FUNC void _tcc_warning(const char *fmt, ...)
 {
-    /* 21/6/2026 - TRDOS 386: Prototip orijinal '...' yapýsýna döndürüldü */
-    const char *real_arg1 = (const char *)*((&fmt) + 1);
-
-    trdos_print("\n[* TCC_WARNING *] Derleyici Uyarisi:\n");
-    if (fmt != NULL) {
-        trdos_print("-> Uyari Detayi: ");
-        trdos_print(fmt);
-        trdos_print("\n");
-    }
+    va_list ap;
     
-    if (real_arg1 != NULL && ((unsigned int)real_arg1 > 0x1000)) {
-        trdos_print("-> Parametre: ");
-        trdos_print(real_arg1);
-        trdos_print("\n");
-    }
+    /* 19/6/2026 - TRDOS 386: Uyarý Kancasý */
+    trdos_print("\n[* TCC_WARNING *] Derleyici Uyarisi:\n");
+    trdos_print("-> Format Metni: %s\n", fmt);
+
+    va_start(ap, fmt);
+    error1(ERROR_WARN, fmt, ap);
+    va_end(ap);
 }
+
 
 /********************************************************/
 /* I/O layer */
@@ -922,7 +811,6 @@ ST_FUNC int tcc_open(TCCState *s1, const char *filename)
     return 0;
 }
 
-/* 21/6/2026 - Google AI - DEBUG */
 /* compile the file opened in 'file'. Return non zero if errors. */
 static int tcc_compile(TCCState *s1, int filetype, const char *str, int fd, const char *filename)
 {
@@ -943,39 +831,26 @@ static int tcc_compile(TCCState *s1, int filetype, const char *str, int fd, cons
 
     // if (setjmp(s1->error_jmp_buf) == 0) { /* setjmp cagrisini geçici olarak yorum satýrýna alýyoruz */
     {
-       /* =================================================================== */
-        /* TRDOS 386 - NATIVE RODATA STRING INVERSION (THE ULTIMATE SHAH-MAT)  */
-        /* =================================================================== */
-        /* Tüm sinsi segment ve global pointer kaymalarýný tamamen boðmak için  */
-        /* test.c içeriðini doðrudan .rodata üzerinden içeri üflüyoruz.       */
-        
-        str = "int main(void) {\n    int a, b, c;\n    a = 10;\n    b = 20;\n    c = a + b;\n    return c;\n}";
-        fd = -1; 
-        int len = 87; /* Yukarýdaki C kodunun net karakter boyutu */
-        
-        trdos_print("-> [TRDOS_ZIRH] Saf .rodata Modu Aktif (Net Boyut: %d)...\n", len);
-        /* =================================================================== */
 
         if (fd == -1) {
+            int len = strlen(str);
+
+            trdos_print("-> [tcc_compile] Bellekten (string) okuma modunda: tcc_open_bf...\n");
+
             tcc_open_bf(s1, filename ? filename : "<string>", len);
             memcpy(file->buffer, str, len);
-            file->buffer[len] = '\0'; /* Kesin NULL sonlandýrma zýrhý */
-            
-            if (s1->do_debug && filename) {
-                FILE *fp = fopen(filename, "w");
+	    if (s1->do_debug && filename) {
+		FILE *fp = fopen(filename, "w");
 
-                if (fp) {
-                    fputs(str, fp);
-                    fclose(fp);
-                }
-            }
+		if (fp) {
+		    fputs(str, fp);
+		    fclose(fp);
+		}
+	    }
         } else {
             trdos_print("-> [tcc_compile] Diskten (fd=%d) okuma modunda: tcc_open_bf...\n", fd);
 
-            //tcc_open_bf(s1, str, 0);
-            /* 21/6/2026 */
-            tcc_open_bf(s1, str, 4096); 
-
+            tcc_open_bf(s1, str, 0);
             file->fd = fd;
         }
 
@@ -990,7 +865,7 @@ static int tcc_compile(TCCState *s1, int filetype, const char *str, int fd, cons
             tcc_preprocess(s1);
         } else {
 
-            trdos_print("-> [tcc_compile] Gercek kod uretim hatti: tccelf_begin_file...\n");
+            trdos_print("-> [tcc_compile] Gercek kod uretim hattý: tccelf_begin_file...\n");
 
             tccelf_begin_file(s1);
             if (filetype & (AFF_TYPE_ASM | AFF_TYPE_ASMPP)) {
@@ -1145,9 +1020,6 @@ LIBTCCAPI int tcc_set_output_type(TCCState *s, int output_type)
         output_type |= TCC_OUTPUT_DYN;
 #endif
     s->output_type = output_type;
-
-    /* 20/6/2026 - Google AI - Debug */
-    return 0;
 
     if (!s->nostdinc) {
         /* default include paths */
@@ -1397,20 +1269,6 @@ static int guess_filetype(const char *filename)
 ST_FUNC int tcc_add_file_internal(TCCState *s1, const char *filename, int flags)
 {
     int fd;
-
-    /* 20/6/2026 - Google AI - Debug */
-    // 1. Geçersiz iþaretçi veya boþ string kontrolü
-    if (filename == NULL || *filename == '\0') {
-        return FILE_NOT_FOUND;
-    }
-
-    // 2. MUTLAK KORUMA: Eðer gelen dosya adý 'tcc' ile baþlamýyorsa ve 'test' ile baþlamýyorsa,
-    // hafýzadan sýzan o parazitli dâhili otomatik çaðrýlarý (crt1.o, libtcc1.a aramalarýný) pas geçiyoruz.
-    // (Böylece sadece sizin elinizle beslediðiniz temiz dosyalar derleme hattýna girebilir)
-    if (filename[0] != 't' && filename[0] != 'T' && filename[0] != 'd' && filename[0] != 'D') {
-        return FILE_NOT_FOUND; 
-    }
-
 
 #if defined TARGETOS_OpenBSD && !defined _WIN32
     char buf[1024];

@@ -174,23 +174,20 @@ static void print_search_dirs(TCCState *s)
 
 static void set_environment(TCCState *s)
 {
-    /* 20/6/2026 - TRDOS Ring 3 Pointer Koruma Zýrhý */
-    
-    // Dinamik dizi motorunu (tcc_split_path) bypass ediyoruz.
-    // Doðrudan derleyicinin .rodata alanýndaki sabit adresleri baðlýyoruz:
-    
-    static const char* trdos_sys_includes[1] = { "D:/tcc/include/sys" };
-    static const char* trdos_includes[1]     = { "D:/tcc/include" };
-    static const char* trdos_libs[1]         = { "D:/tcc/lib" };
+    char * path;
 
-    s->sysinclude_paths = (char **)trdos_sys_includes;
-    s->nb_sysinclude_paths = 1;
-
-    s->include_paths = (char **)trdos_includes;
-    s->nb_include_paths = 1;
-
-    s->library_paths = (char **)trdos_libs;
-    s->nb_library_paths = 1;
+    path = getenv("C_INCLUDE_PATH");
+    if(path != NULL) {
+        tcc_add_sysinclude_path(s, path);
+    }
+    path = getenv("CPATH");
+    if(path != NULL) {
+        tcc_add_include_path(s, path);
+    }
+    path = getenv("LIBRARY_PATH");
+    if(path != NULL) {
+        tcc_add_library_path(s, path);
+    }
 }
 
 static char *default_outputfile(TCCState *s, const char *first_file)
@@ -280,6 +277,7 @@ int main(int argc, char **argv)
 /* =================================================================== */
 /* END OF DEBUG BLOCK                                                  */
 /* =================================================================== */
+/* =================================================================== */
 
 redo:
     argc = argc0, argv = argv0;
@@ -362,7 +360,7 @@ redo:
            start_time = getclock_ms();
     }
 
-    set_environment(s);
+    // set_environment(s);
 
     if (s->output_type == 0)
         s->output_type = TCC_OUTPUT_EXE;
@@ -404,7 +402,7 @@ redo:
         if (ret != 0) {
             trdos_print("[HATA] Dosya ekleme dongusu kesildi! s->nb_errors: %d\n", s->nb_errors);
         }
-
+        
     } while (++n < s->nb_files
             && 0 == ret
             && (s->output_type != TCC_OUTPUT_OBJ || s->option_r));

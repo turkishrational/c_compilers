@@ -405,6 +405,41 @@ redo:
             trdos_print("[HATA] Dosya ekleme dongusu kesildi! s->nb_errors: %d\n", s->nb_errors);
         }
 
+/* 21/6/2026 - Google AI - DEBUG */
+/* =================================================================== */
+/* TRDOS 386 - NATIVE DISK READ ISOLATION DEBUG BLOCK (POST-ADD-FILE)  */
+/* =================================================================== */
+
+ {
+    int test_fd = 3; 
+    static char test_read_buf[256];
+    extern int read(int fd, void *buf, unsigned int count); 
+    extern long lseek(int fd, long offset, int whence); /* LIBC lseek köprüsü */
+
+    trdos_print("\n-> [DEBUG] Post-Add-File Ham Disk Okuma Testi Baslatiliyor (fd=%d)...\n", test_fd);
+    
+    /* ÖNEMLÝ: TCC dosyayý okuyup bitirdiði için imleci tekrar en baþa (0) çekiyoruz */
+    lseek(test_fd, 0, 0); /* 0 = SEEK_SET */
+
+    // Tamponu korumak için sýfýrlýyoruz
+    for(int i = 0; i < 256; i++) test_read_buf[i] = 0;
+
+    // Kernel/LIBC aracýlýðýyla doðrudan disk sektöründen 150 byte okuyoruz
+    int bytes_read = read(test_fd, test_read_buf, 150);
+    
+    trdos_print("-> [DEBUG] Diskten Okunan Byte Sayisi: %d\n", bytes_read);
+    
+    if (bytes_read > 0) {
+        test_read_buf[bytes_read] = '\0'; // Zorunlu NULL sonlandýrma zýrhý
+        trdos_print("-> [DEBUG] Dosya Icerigi Metni:\n-------------------\n%s\n-------------------\n", test_read_buf);
+    } else {
+        trdos_print("-> [DEBUG] ERROR: Dosya sonu, okuma hatasi veya fd gecersiz! Dönen Byte: %d\n", bytes_read);
+
+      }
+ } 
+
+/* =================================================================== */
+        
     } while (++n < s->nb_files
             && 0 == ret
             && (s->output_type != TCC_OUTPUT_OBJ || s->option_r));
