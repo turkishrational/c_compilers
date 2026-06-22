@@ -69,13 +69,6 @@
 /* 18/6/2026 - Google AI - Debug */
 extern int trdos_print(const char *format, ...);
 
-/* 21/6/2026 - Google AI - Debug */
-/* libtcc.c - Dosyanýn en üstü, global alan */
-
-const char *trdos_zirh_str = "int main(void) {\n    int a, b, c;\n    a = 10;\n    b = 20;\n    c = a + b;\n    return c;\n}";
-
-int trdos_zirh_len = 87;
-
 #define printf trdos_print
 
 /********************************************************/
@@ -762,77 +755,40 @@ LIBTCCAPI void tcc_set_error_func(TCCState *s, void *error_opaque, TCCErrorFunc 
 #undef _tcc_error
 PUB_FUNC void _tcc_error(const char *fmt, ...)
 {
-    /* 22/06/2026 - TRDOS 386: FATAL ERROR HEX EXTRACTION FIXED */
-    // cdecl standardýna göre format string'inin hemen arkasýndaki 
-    // ilk ham argümaný yýðýndan elceðizimizle çekiyoruz:
-    unsigned int raw_char_val = (unsigned int)*((&fmt) + 1);
-
-    /* Hex dönüþümü için flat binary güvenli static bir tampon açýyoruz */
-    static char hex_conversion_buf[32];
-    extern void itoab(unsigned int value, char *str, int base);
-
+    /* 21/6/2026 - TRDOS 386: Prototip orijinal '...' yapýsýna döndürüldü */
     trdos_print("\n[!!! TCC_ERROR !!!] Derleyici Olumcul Hata Yakaladi:\n");
-
     if (fmt != NULL) {
         trdos_print("-> Hata Detayi: ");
-        trdos_print(fmt); /* "unrecognized character \x%02x" metni */
+        trdos_print(fmt);
         trdos_print("\n");
-        
-        /* =================================================================== */
-        /* TRDOS 386 - NATIVE HEX DISPLAY ARMOR (SHAH-MAT)                     */
-        /* =================================================================== */
-        /* va_list offset kaymasý yüzünden ekrana basýlan o sahte yýðýn        */
-        /* adresini (0xFFBFFFxx) bypass edip, yýðýndan çektiðimiz o saf ilk     */
-        /* deðeri (karakterin ham hex kodunu) _itoab ile açýkça döküyoruz!     */
-        if (fmt[0] == 'u' && fmt[1] == 'n') { /* "unrecognized..." güvenli char kontrolü */
-            
-            /* Tamponu çöp verilerden korumak için sýfýrlýyoruz */
-            for(int i = 0; i < 32; i++) hex_conversion_buf[i] = 0;
-            
-            /* libc_itoa.s içindeki _itoab motorunu doðrudan tetikliyoruz */
-            itoab(raw_char_val, hex_conversion_buf, 16); /* Base 16 = Hexadecimal */
-            
-            trdos_print("-> [TRDOS_ZIRH] Maskelenen Ham Karakter/Deger (HEX): 0x");
-            trdos_print(hex_conversion_buf);
-            trdos_print("\n");
-        }
-        /* =================================================================== */
     }
-
-    /* TCC'nin orijinal abort/exit zinciri yerine TRDOS yerel exit'i */
-    exit(1); 
+    exit(1);
 }
-            
+
 #define _tcc_error use_tcc_error_noabort
 
 PUB_FUNC int _tcc_error_noabort(const char *fmt, ...)
 {
-    /* 22/06/2026 - TRDOS 386: STACK-EXTRACTION FORMAT ZIRHI (ZERO-DEPENDENCY) */
+    /* 21/6/2026 - TRDOS 386: STACK-EXTRACTION ZIRHI (PROTOTIP KORUNDU) */
+    // Prototip orijinal '...' kalarak tüm derleme hatalarýný temizler.
+    
+    // GCC'nin yýðýn hizalamasýný bozmasýna izin vermemek için, cdecl standardýna göre
+    // fmt parametresinin tam 4 byte ilerisinde duran gerçek 2. argümaný (filename)
+    // elinizle doðrudan yýðýndan (stack) çekiyoruz:
     const char *real_arg1 = (const char *)*((&fmt) + 1);
 
     trdos_print("\n[! TCC_ERROR_NOABORT !] Derleyici Hata Yakaladi (Devam Edilebilir):\n");
 
     if (fmt != NULL) {
         trdos_print("-> Hata Detayi: ");
-        trdos_print(fmt); 
+        trdos_print(fmt); // file '%s' not found basýlýr
         trdos_print("\n");
-        
-        /* =================================================================== */
-        /* TRDOS 386 - ZERO-DEPENDENCY FORMAT PROTECTION (SHAH-MAT)            */
-        /* =================================================================== */
-        /* strstr baðýmlýlýðýný kaldýrmak için doðrudan karakter kontrolü      */
-        /* yapýyoruz. "unrecognized character" -> 'u' ve 'n' ile baþlar.      */
-        if (fmt[0] == 'u' && fmt[1] == 'n') {
-            trdos_print("-> [TRDOS_ZIRH] Sahte Yigin Sizintisi Boguldu. Derleme Surduruluyor...\n");
-            return -1; /* Derleyiciyi durdurmadan güvenle dön! */
-        }
-        /* =================================================================== */
     }
     
-    /* Sadece gerçek string adresleri için bu bloku çalýþtýrýyoruz (Örn: file not found) */
-    if (real_arg1 != NULL && ((unsigned int)real_arg1 > 0x10000)) {
+    // Eðer yýðýndan elinizle çektiðiniz gerçek argüman geçerli bir bellek adresiyse bas:
+    if (real_arg1 != NULL && ((unsigned int)real_arg1 > 0x1000)) {
         trdos_print("-> Dosya Adi / Parametre: ");
-        trdos_print(real_arg1); 
+        trdos_print(real_arg1); // test2.c veya ilgili çöp olmayan ham string basýlýr
         trdos_print("\n");
     }
 
@@ -943,20 +899,32 @@ static int tcc_compile(TCCState *s1, int filetype, const char *str, int fd, cons
 
     // if (setjmp(s1->error_jmp_buf) == 0) { /* setjmp cagrisini geçici olarak yorum satýrýna alýyoruz */
     {
-       /* =================================================================== */
-        /* TRDOS 386 - NATIVE RODATA STRING INVERSION (THE ULTIMATE SHAH-MAT)  */
         /* =================================================================== */
-        /* Tüm sinsi segment ve global pointer kaymalarýný tamamen boðmak için  */
-        /* test.c içeriðini doðrudan .rodata üzerinden içeri üflüyoruz.       */
-        
-        str = "int main(void) {\n    int a, b, c;\n    a = 10;\n    b = 20;\n    c = a + b;\n    return c;\n}";
-        fd = -1; 
-        int len = 87; /* Yukarýdaki C kodunun net karakter boyutu */
-        
-        trdos_print("-> [TRDOS_ZIRH] Saf .rodata Modu Aktif (Net Boyut: %d)...\n", len);
+        /* TRDOS 386 - NATIVE FILE-TO-STRING INVERSION ARMOR (FINAL FIX)       */
+        /* =================================================================== */
+        /* Flat modelde fstat/struct uyuþmazlýðýný tamamen bypass etmek için    */
+        /* disk dosyasýný tek seferde okuyup hafýza moduna ters-yüz ediyoruz.   */
+        static char static_file_load_buf[4096]; 
+        extern int read(int fd, void *buf, unsigned int count);
+        int total_bytes_read = 0;
+
+        if (fd != -1) {
+            /* 1. Ýçeriði kernel/read.s köprüsüyle doðrudan statik tamponumuza alýyoruz */
+            for(int i = 0; i < 4096; i++) static_file_load_buf[i] = 0;
+            total_bytes_read = read(fd, static_file_load_buf, 4095);
+            
+            /* TCC'nin dahili kilitlerine bulaþmamasý için parametreleri hafýza moduna çeviriyoruz */
+            str = static_file_load_buf;
+            fd = -1; 
+        }
         /* =================================================================== */
 
         if (fd == -1) {
+            /* TCC artýk fstat gerektirmeyen, len sýnýrýnýn kesin olduðu zýrhlý modla iþleyecek */
+            int len = (total_bytes_read > 0) ? total_bytes_read : strlen(str);
+
+            trdos_print("-> [tcc_compile] Zýrhlý Bellek Modunda Okuma Baþlatýlýyor (Boyut: %d)...\n", len);
+
             tcc_open_bf(s1, filename ? filename : "<string>", len);
             memcpy(file->buffer, str, len);
             file->buffer[len] = '\0'; /* Kesin NULL sonlandýrma zýrhý */

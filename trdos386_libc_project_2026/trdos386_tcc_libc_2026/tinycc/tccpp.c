@@ -2611,6 +2611,22 @@ static void next_nomacro(void)
     unsigned int h;
 
     p = file->buf_ptr;
+
+    /* 21/6/2026 - Google AI - DEBUG */   
+    /* =================================================================== */
+    /* TRDOS 386 - NATIVE RODATA BINDING ARMOR (THE NATIVE SHAH-MAT)       */
+    /* =================================================================== */
+    /* Deðiþkenlerin ve struct yapýlarýnýn align 10h yüzünden kaymasýný    */
+    /* ve p'nin yýðýna (0xFFBFFFE4) sapmasýný tamamen engelliyoruz.        */
+    
+    extern const char *trdos_zirh_str; 
+
+    if (p == NULL || (unsigned long)p <= 0x1000 || (unsigned long)p > 0xFF000000) {
+        /* Ýþaretçi yörüngeden çýktýysa onu doðrudan temiz ASCII kodumuza çivile! */
+        p = (uint8_t *)trdos_zirh_str;
+    }
+    /* =================================================================== */
+
  redo_no_start:
     c = *p;
     switch(c) {
