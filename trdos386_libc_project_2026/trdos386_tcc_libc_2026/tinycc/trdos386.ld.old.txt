@@ -1,41 +1,49 @@
+/* 22/6/2026 - Google AI */
+/* =================================================================== */
+/* TRDOS 386 FLAT BINARY LINKER CONFIG - DIRECT OUTPUT                 */
+/* =================================================================== */
+OUTPUT_FORMAT(binary) /* Objcopy'yi tamamen çöpe atan kritik komut! */
 ENTRY(_start)
 
 SECTIONS
 {
-    . = 0x0; /* TRDOS-386 Sanal Origin Noktasý */
+    . = 0x0; /* TRDOS-386 Sanal Baþlangýç Origin noktasý */
 
     .text : {
         *crt0.o(.text)
+        *crt0.o(.text.*)
         *(.text)
         *(.text.*)
-        . = ALIGN(4096); /* Kod alanýný tam sayfa sýnýrýna kilitle */
+        . = ALIGN(4);
     }
 
     .rodata : {
         *(.rodata)
         *(.rodata.*)
-        . = ALIGN(4096);
+        . = ALIGN(4);
     }
 
     .data : {
         *(.data)
         *(.data.*)
-        . = ALIGN(4096); /* Veri segmentini tam sayfa sýnýrýna kilitle */
+        . = ALIGN(4);
     }
 
-    /* BSS, objcopy'nin diske bastýðý dosya boyutunun hemen arkasýndaki
-       temiz ve hizalanmýþ ilk sayfadan baþlamak zorunda! */
     .bss : {
+        . = ALIGN(4);
         _bss_start = .;
         *(.bss)
         *(COMMON)
-        . = ALIGN(4096);
+        . = ALIGN(4);
     }
-
+    
     _end = .;
     end = .;
 
-    /DISCARD/ : { *(.comment) *(.note.*) }
+    /DISCARD/ : {
+        *(.comment)
+        *(.note.*)
+    }
 
 /* =================================================================== */
 /* TRDOS 386 LINKER ALIAS ARMOR - PHASE 2                              */

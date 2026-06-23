@@ -34,16 +34,29 @@
    TRDOS 386 Port - Standard Stream Override Macro Layer (No Warnings)
    =========================================================================== */
 #ifdef TCC_TARGET_I386
+    /* 20/6/2026 */
     /* Force the compiler to resolve stdout/stderr as a flat 4-byte pointer array */
     /* This completely bypasses the 32-byte MinGW struct offset alignment (+32/+64) */
+     typedef struct {
+        int fd;               // TRDOS 386 için gerçek File Descriptor (Ýlk 4-byte)
+        char padding[28];     // TCC'nin dâhili overwrite eylemini sönümleyen 28-byte'lýk boþ alan
+    } TRDOS_FakeFile;
+
+    // Bellekte ardýþýk 3 adet korumalý nesne açýyoruz (Toplam 96 byte)
+    static TRDOS_FakeFile trdos_std_streams[3] = {
+        { 0, {0} },           // stdin zýrhý (fd=0)
+        { 1, {0} },           // stdout zýrhý (fd=1)
+        { 2, {0} }            // stderr zýrhý (fd=2)
+    };
+
+    #undef stdin
     #undef stdout
     #undef stderr
-    #undef stdin
 
-    /* 1. Map stdout/stderr to our flat 4-byte DWORD pointer array elements in libc_core */
-    #define stdin  ((FILE*)(_iob))
-    #define stdout ((FILE*)((char*)(_iob) + 4))
-    #define stderr ((FILE*)((char*)(_iob) + 8))
+    // TCC dâhili pointer'larýný bu kýrýlmaz zýrhlý yapýlara yönlendiriyoruz
+    #define stdin  ((FILE*)(&trdos_std_streams[0]))
+    #define stdout ((FILE*)(&trdos_std_streams[1]))
+    #define stderr ((FILE*)(&trdos_std_streams[2]))
 
     /* 2. Override MinGW's exit() to directly invoke TRDOS 386 native sys_exit */
 
@@ -159,11 +172,17 @@ extern long double strtold (const char *__nptr, char **__endptr);
 # define PRINTF_LIKE(x,y) __attribute__ ((format (printf, (x), (y))))
 #endif
 
-/* 22/6/2026 - Google AI */
-#define IS_DIRSEP(c)  (c == '/')
-#define IS_ABSPATH(p) (p[0] == '/' || (p[0] && p[1] == ':' && p[2] == '/'))
-#define PATHCMP       strcmp
-#define PATHSEP       ":"
+#ifdef _WIN32
+# define IS_DIRSEP(c) (c == '/' || c == '\\')
+# define IS_ABSPATH(p) (IS_DIRSEP(p[0]) || (p[0] && p[1] == ':' && IS_DIRSEP(p[2])))
+# define PATHCMP stricmp
+# define PATHSEP ";"
+#else
+# define IS_DIRSEP(c) (c == '/')
+# define IS_ABSPATH(p) IS_DIRSEP(p[0])
+# define PATHCMP strcmp
+# define PATHSEP ":"
+#endif
 
 /* -------------------------------------------- */
 
@@ -280,22 +299,22 @@ extern long double strtold (const char *__nptr, char **__endptr);
 
 /* ------------ path configuration ------------ */
 
-/* 22/06/2026 - Google AI */
 #ifndef CONFIG_SYSROOT
 # define CONFIG_SYSROOT ""
 #endif
-
-/* TCC'nin ana kök dizini (D:/tcc veya -B ile gelen dizin) */
-#ifndef CONFIG_TCCDIR
-# define CONFIG_TCCDIR "D:/tcc"
+#if !defined CONFIG_TCCDIR && !defined _WIN32
+# define CONFIG_TCCDIR "/usr/local/lib/tcc"
 #endif
-
 #ifndef CONFIG_LDDIR
 # define CONFIG_LDDIR "lib"
 #endif
-
-#define USE_TRIPLET(s)  s
-#define ALSO_TRIPLET(s) s
+#ifdef CONFIG_TRIPLET
+# define USE_TRIPLET(s) s "/" CONFIG_TRIPLET
+# define ALSO_TRIPLET(s) USE_TRIPLET(s) ":" s
+#else
+# define USE_TRIPLET(s) s
+# define ALSO_TRIPLET(s) s
+#endif
 
 /* path to find crt1.o, crti.o and crtn.o */
 #ifndef CONFIG_TCC_CRTPREFIX
@@ -309,10 +328,29 @@ extern long double strtold (const char *__nptr, char **__endptr);
 /* Below: {B} is substituted by CONFIG_TCCDIR (rsp. -B option) */
 
 /* system include paths */
-#define CONFIG_TCC_SYSINCLUDEPATHS "{B}/include"
+#ifndef CONFIG_TCC_SYSINCLUDEPATHS
+# if defined TCC_TARGET_PE || defined _WIN32
+#  define CONFIG_TCC_SYSINCLUDEPATHS "{B}/include"PATHSEP"{B}/include/winapi"
+# else
+#  define CONFIG_TCC_SYSINCLUDEPATHS \
+        "{B}/include" \
+    ":" ALSO_TRIPLET(CONFIG_SYSROOT "/usr/local/include") \
+    ":" ALSO_TRIPLET(CONFIG_SYSROOT CONFIG_USR_INCLUDE)
+# endif
+#endif
 
 /* library search paths */
-#define CONFIG_TCC_LIBPATHS        "{B}/lib"
+#ifndef CONFIG_TCC_LIBPATHS
+# if defined TCC_TARGET_PE || defined _WIN32
+#  define CONFIG_TCC_LIBPATHS "{B}/lib"
+# else
+#  define CONFIG_TCC_LIBPATHS \
+        "{B}" \
+    ":" ALSO_TRIPLET(CONFIG_SYSROOT "/usr/" CONFIG_LDDIR) \
+    ":" ALSO_TRIPLET(CONFIG_SYSROOT "/" CONFIG_LDDIR) \
+    ":" ALSO_TRIPLET(CONFIG_SYSROOT "/usr/local/" CONFIG_LDDIR)
+# endif
+#endif
 
 /* name of ELF interpreter */
 #ifndef CONFIG_TCC_ELFINTERP
