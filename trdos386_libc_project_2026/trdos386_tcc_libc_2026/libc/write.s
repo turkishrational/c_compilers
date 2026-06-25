@@ -17,7 +17,7 @@ _write:
     jb .L_write_stdio     /* If fd < 3 (0, 1, 2), route to console sys_stdio */
 
     /* -----------------------------------------------------------------------
-       Standard File Write (sys_write)
+       Standard File Write (sys_write) - DEÐÝÞMEDÝ
        ----------------------------------------------------------------------- */
     sub ebx, 3            /* Convert C-FD to TRDOS-FD */
     mov ecx, esi          /* ECX = buffer address */
@@ -28,42 +28,62 @@ _write:
     jmp .L_write_fail
 
     /* -----------------------------------------------------------------------
-       Console Output Write Loop (sys_stdio - Character by Character)
+       Console Output Write Loop (sys_stdio - FIX: Sadece EDI Count Kadar Basar)
        ----------------------------------------------------------------------- */
+
+    /* 24/6/2026 - Erdogan Tan */
+.pchar:
+    .byte 0		  /* Previous Character - CRLF check */
+
 .L_write_stdio:
     cmp ebx, 0
     je .L_write_fail      /* Writing to stdin (fd=0) is invalid */
 
-    /* Map C-FD to TRDOS sys_stdio BL codes: fd=1 (stdout) -> BL=2, fd=2 (stderr) -> BL=3 */
+    /* Map C-FD to TRDOS sys_stdio BL codes */
     cmp ebx, 2
     je .L_set_stderr
-    mov bl, 2             /* BL = 2 (stdout onto screen with redirection support) */
+    mov bl, 2             /* BL = 2 (stdout) */
     jmp .L_init_loop
 .L_set_stderr:
-    mov bl, 3             /* BL = 3 (stderr onto screen without redirection) */
+    mov bl, 3             /* BL = 3 (stderr) */
 
 .L_init_loop:
     xor edx, edx          /* EDX = Character counter (bytes written) */
 
 .L_stdio_loop_next:
-    cmp edx, edi          /* Check if counter (EDX) has reached count (EDI) */
-    jnb .L_stdio_loop_ok
+    cmp edx, edi          /* Sýnýr Kontrolü: Sayaç (EDX) == Ýstenen byte (EDI) oldu mu? */
+    jnb .L_stdio_loop_ok  /* Sayaca ulaþýldýysa null karakter uyarýsý olmadan baþarýyla çýk */
 
-    mov cl, [esi]         /* CL = ASCII character code to be printed */
+    mov cl, [esi]         /* CL = ASCII character code (Null dahil her þey basýlýr) */
+    /* 24/6/2026 */
     test cl, cl           /* Check for ASCIIZ null terminator */
-    jz .L_stdio_loop_ok
-
-    mov ch, 0             /* CH = 0 (No CGA color attribute used here) */
+    // jz .L_stdio_loop_ok
+    jz .skip_stdio_w  
+    
+    cmp	cl, 10            /* LF */
+    jne .skip_crlf
+    cmp byte ptr [.pchar], 13 /* CR */ 
+    je  .skip_crlf
+    mov ecx, 13
     mov eax, 46           /* EAX = 46 (TRDOS 386 sys_stdio) */
-    int 0x40              /* Call kernel to print a single character in CL */
-    jc .L_write_fail      /* If CF=1, kernel returned a hard hardware/I/O error */
+    int 0x40              /* Call kernel to print a single character */
+    jc .L_write_fail
+    mov cl, 10
+.skip_crlf:
+    mov byte ptr [.pchar], cl
 
+    mov ch, 0             /* CH = 0 (No CGA color attribute) */
+    mov eax, 46           /* EAX = 46 (TRDOS 386 sys_stdio) */
+    int 0x40              /* Call kernel to print a single character */
+    jc .L_write_fail
+
+.skip_stdio_w:
     inc edx               /* Increment processed characters counter */
     inc esi               /* Advance buffer pointer to the next character */
     jmp .L_stdio_loop_next
 
 .L_stdio_loop_ok:
-    mov eax, edx          /* Return total number of bytes successfully written */
+    mov eax, edx          /* TCC'ye tam olarak yazýlan gerçek byte sayýsýný dön */
     jmp .L_write_done
 
 .L_write_fail:
