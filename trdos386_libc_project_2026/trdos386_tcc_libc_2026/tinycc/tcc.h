@@ -28,48 +28,6 @@
 #include <stdarg.h>
 #include <stdlib.h>
 #include <stdio.h>
-
-/* 16/6/2026 - Google AI */
-/* ===========================================================================
-   TRDOS 386 Port - Standard Stream Override Macro Layer (No Warnings)
-   =========================================================================== */
-#ifdef TCC_TARGET_I386
-    /* Force the compiler to resolve stdout/stderr as a flat 4-byte pointer array */
-    /* This completely bypasses the 32-byte MinGW struct offset alignment (+32/+64) */
-    #undef stdout
-    #undef stderr
-    #undef stdin
-
-    /* 1. Map stdout/stderr to our flat 4-byte DWORD pointer array elements in libc_core */
-    #define stdin  ((FILE*)(_iob))
-    #define stdout ((FILE*)((char*)(_iob) + 4))
-    #define stderr ((FILE*)((char*)(_iob) + 8))
-
-    /* 2. Override MinGW's exit() to directly invoke TRDOS 386 native sys_exit */
-
-    /* This completely bypasses Win32 hang/cleanup loops inside TCCState errors */
-/*   #undef exit
-  #define exit(status) __asm__ __volatile__("movl %0, %%ebx\n\t" "movl $1, %%eax\n\t" "int $0x40\n\t" : : "r"(status) : "eax", "ebx") */
-
-/* ===========================================================================
-   TRDOS 386 Port - Defensively Patched exit() Macro for Deep Trace Debugging
-   =========================================================================== */
-    #undef exit
-    
-    #define exit(status) do { \
-        __asm__ __volatile__ ( \
-            "movl %0, %%ebx\n\t"   /* EBX = exit status code */ \
-            "movl $1, %%eax\n\t"   /* EAX = 1 (sys_exit) */ \
-            "int $0x40\n\t"        /* Terminate the process via TRDOS kernel */ \
-            : \
-            : "r" (status) \
-            : "eax", "ebx" \
-        ); \
-    } while(0)
-
-#endif
-/* =========================================================================== */
-
 /* gnu headers use to #define __attribute__ to empty for non-gcc compilers */
 #ifdef __TINYC__
 # undef __attribute__
@@ -159,11 +117,24 @@ extern long double strtold (const char *__nptr, char **__endptr);
 # define PRINTF_LIKE(x,y) __attribute__ ((format (printf, (x), (y))))
 #endif
 
-/* 22/6/2026 - Google AI */
-#define IS_DIRSEP(c)  (c == '/')
-#define IS_ABSPATH(p) (p[0] == '/' || (p[0] && p[1] == ':' && p[2] == '/'))
-#define PATHCMP       strcmp
-#define PATHSEP       ":"
+#ifdef _WIN32
+# define IS_DIRSEP(c) (c == '/' || c == '\\')
+# define IS_ABSPATH(p) (IS_DIRSEP(p[0]) || (p[0] && p[1] == ':' && IS_DIRSEP(p[2])))
+# define PATHCMP stricmp
+# define PATHSEP ";"
+#else
+# define IS_DIRSEP(c) (c == '/')
+/* 24/6/2026 */
+#ifdef TCC_TARGET_I386
+  # define IS_ABSPATH(p) (IS_DIRSEP(p[0]) || (p[0] && p[1] == ':' && IS_DIRSEP(p[2])))
+  # define PATHCMP stricmp
+  # define PATHSEP ";"
+#else
+  # define IS_ABSPATH(p) IS_DIRSEP(p[0])
+  # define PATHCMP strcmp
+  # define PATHSEP ":"
+#endif
+#endif
 
 /* -------------------------------------------- */
 
@@ -280,22 +251,22 @@ extern long double strtold (const char *__nptr, char **__endptr);
 
 /* ------------ path configuration ------------ */
 
-/* 22/06/2026 - Google AI */
 #ifndef CONFIG_SYSROOT
 # define CONFIG_SYSROOT ""
 #endif
-
-/* TCC'nin ana kök dizini (D:/tcc veya -B ile gelen dizin) */
-#ifndef CONFIG_TCCDIR
-# define CONFIG_TCCDIR "D:/tcc"
+#if !defined CONFIG_TCCDIR && !defined _WIN32
+# define CONFIG_TCCDIR "/usr/local/lib/tcc"
 #endif
-
 #ifndef CONFIG_LDDIR
 # define CONFIG_LDDIR "lib"
 #endif
-
-#define USE_TRIPLET(s)  s
-#define ALSO_TRIPLET(s) s
+#ifdef CONFIG_TRIPLET
+# define USE_TRIPLET(s) s "/" CONFIG_TRIPLET
+# define ALSO_TRIPLET(s) USE_TRIPLET(s) ":" s
+#else
+# define USE_TRIPLET(s) s
+# define ALSO_TRIPLET(s) s
+#endif
 
 /* path to find crt1.o, crti.o and crtn.o */
 #ifndef CONFIG_TCC_CRTPREFIX
@@ -309,29 +280,35 @@ extern long double strtold (const char *__nptr, char **__endptr);
 /* Below: {B} is substituted by CONFIG_TCCDIR (rsp. -B option) */
 
 /* system include paths */
-#define CONFIG_TCC_SYSINCLUDEPATHS "{B}/include"
-
-/* library search paths */
-#define CONFIG_TCC_LIBPATHS        "{B}/lib"
-
-/* name of ELF interpreter */
-#ifndef CONFIG_TCC_ELFINTERP
-# if defined __GNU__
-#  define CONFIG_TCC_ELFINTERP "/lib/ld.so"
-# elif defined(TCC_TARGET_PE)
-#  define CONFIG_TCC_ELFINTERP "-"
-# elif defined TCC_TARGET_ARM64
-#  define CONFIG_TCC_ELFINTERP "/lib/ld-linux-aarch64.so.1"
-# elif defined(TCC_TARGET_X86_64)
-#  define CONFIG_TCC_ELFINTERP "/lib64/ld-linux-x86-64.so.2"
-# elif defined(TCC_TARGET_RISCV64)
-#  define CONFIG_TCC_ELFINTERP "/lib/ld-linux-riscv64-lp64d.so.1"
-# elif defined(TCC_ARM_EABI)
-#  define DEFAULT_ELFINTERP(s) default_elfinterp(s)
+#ifndef CONFIG_TCC_SYSINCLUDEPATHS
+# if defined TCC_TARGET_PE || defined _WIN32
+#  define CONFIG_TCC_SYSINCLUDEPATHS "{B}/include"PATHSEP"{B}/include/winapi"
 # else
-#  define CONFIG_TCC_ELFINTERP "/lib/ld-linux.so.2"
+#  define CONFIG_TCC_SYSINCLUDEPATHS \
+        "{B}/include" \
+    ":" ALSO_TRIPLET(CONFIG_SYSROOT "/usr/local/include") \
+    ":" ALSO_TRIPLET(CONFIG_SYSROOT CONFIG_USR_INCLUDE)
 # endif
 #endif
+
+/* library search paths */
+#ifndef CONFIG_TCC_LIBPATHS
+# if defined TCC_TARGET_PE || defined _WIN32
+#  define CONFIG_TCC_LIBPATHS "{B}/lib"
+# else
+#  define CONFIG_TCC_LIBPATHS \
+        "{B}" \
+    ":" ALSO_TRIPLET(CONFIG_SYSROOT "/usr/" CONFIG_LDDIR) \
+    ":" ALSO_TRIPLET(CONFIG_SYSROOT "/" CONFIG_LDDIR) \
+    ":" ALSO_TRIPLET(CONFIG_SYSROOT "/usr/local/" CONFIG_LDDIR)
+# endif
+#endif
+
+/* name of ELF interpreter */
+/* 24/6/2026 - Google AI */
+#undef CONFIG_TCC_ELFINTERP
+
+#define CONFIG_TCC_ELFINTERP "-"
 
 /* var elf_interp dans *-gen.c */
 #ifndef DEFAULT_ELFINTERP
@@ -339,9 +316,11 @@ extern long double strtold (const char *__nptr, char **__endptr);
 #endif
 
 /* (target specific) libtcc1.a */
-#ifndef TCC_LIBTCC1
-# define TCC_LIBTCC1 "libtcc1.a"
-#endif
+/* 24/6/2026 - Google AI */
+/* "i386-win32-libtcc1.a" parazitini tamamen temizliyoruz */
+#undef TCC_LIBTCC1
+
+#define TCC_LIBTCC1 "libtcc1.a"
 
 /* library to use with CONFIG_USE_LIBGCC instead of libtcc1.a */
 #if defined CONFIG_USE_LIBGCC && !defined TCC_LIBGCC
@@ -651,7 +630,9 @@ typedef struct DLLReference {
 #define TYPE_PARAM     4 /* type declares function parameter */
 #define TYPE_NEST      8 /* nested call to post_type */
 
-#define IO_BUF_SIZE 8192
+// #define IO_BUF_SIZE 8192
+/* 24/6/2026 */
+#define IO_BUF_SIZE 65536
 
 typedef struct BufferedFile {
     uint8_t *buf_ptr;

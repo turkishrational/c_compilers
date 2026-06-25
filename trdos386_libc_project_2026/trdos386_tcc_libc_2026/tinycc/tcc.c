@@ -28,11 +28,68 @@
 #endif
 #include "tcctools.c"
 
-/* 18/6/2026 - Google AI */
-// extern int trdos_print(const char *format, ...);
-// #define printf trdos_print
-
-static const char help[] = "TCC TRDOS 386 HELP TEST\n";
+static const char help[] =
+    "Tiny C Compiler "TCC_VERSION" - Copyright (C) 2001-2006 Fabrice Bellard\n"
+    "Usage: tcc [options...] [-o outfile] [-c] infile(s)...\n"
+    "       tcc [options...] -run infile (or --) [arguments...]\n"
+    "General options:\n"
+    "  -c           compile only - generate an object file\n"
+    "  -o outfile   set output filename\n"
+    "  -run         run compiled source [with custom stdin: -rstdin FILE]\n"
+    "  -fflag       set or reset (with 'no-' prefix) 'flag' (see tcc -hh)\n"
+    "  -Wwarning    set or reset (with 'no-' prefix) 'warning' (see tcc -hh)\n"
+    "  -w           disable all warnings\n"
+    "  -v --version show version\n"
+    "  -vv          show search paths or loaded files\n"
+    "  -h -hh       show this, show more help\n"
+    "  -bench       show compilation statistics\n"
+    "  -            use stdin pipe as infile\n"
+    "  @listfile    read arguments from listfile\n"
+    "Preprocessor options:\n"
+    "  -Idir        add include path 'dir'\n"
+    "  -Dsym[=val]  define 'sym' with value 'val'\n"
+    "  -Usym        undefine 'sym'\n"
+    "  -E           preprocess only\n"
+    "  -nostdinc    do not use standard system include paths\n"
+    "Linker options:\n"
+    "  -Ldir        add library path 'dir'\n"
+    "  -llib        link with dynamic or static library 'lib'\n"
+    "  -nostdlib    do not link with standard crt and libraries\n"
+    "  -r           generate (relocatable) object file\n"
+    "  -rdynamic    export all global symbols to dynamic linker\n"
+    "  -shared      generate a shared library/dll\n"
+    "  -soname      set name for shared library to be used at runtime\n"
+    "  -Wl,-opt[=val]  set linker option (see tcc -hh)\n"
+    "Debugger options:\n"
+    "  -g           generate stab runtime debug info\n"
+    "  -gdwarf[-x]  generate dwarf runtime debug info\n"
+#ifdef TCC_TARGET_PE
+    "  -g.pdb       create .pdb debug database\n"
+#endif
+#ifdef CONFIG_TCC_BCHECK
+    "  -b           compile with built-in memory and bounds checker (implies -g)\n"
+#endif
+#ifdef CONFIG_TCC_BACKTRACE
+    "  -bt[N]       link with backtrace (stack dump) support [show max N callers]\n"
+#endif
+    "Misc. options:\n"
+    "  -std=version define __STDC_VERSION__ according to version (c11/gnu11)\n"
+    "  -x[c|a|b|n]  specify type of the next infile (C,ASM,BIN,NONE)\n"
+    "  -Bdir        set tcc's private include/library dir\n"
+    "  -M[M]D       generate make dependency file [ignore system files]\n"
+    "  -M[M]        as above but no other output\n"
+    "  -MF file     specify dependency file name\n"
+#if defined(TCC_TARGET_I386) || defined(TCC_TARGET_X86_64)
+    "  -m32/64      defer to i386/x86_64 cross compiler\n"
+#endif
+    "Tools:\n"
+    "  create library  : tcc -ar [crstvx] lib [files]\n"
+#ifdef TCC_TARGET_PE
+    "  create def file : tcc -impdef lib.dll [-v] [-o lib.def]\n"
+#endif
+    "Discussion & bug reports:\n"
+    "  https://lists.nongnu.org/mailman/listinfo/tinycc-devel\n"
+    ;
 
 static const char help2[] =
     "Tiny C Compiler "TCC_VERSION" - More Options\n"

@@ -1,0 +1,39 @@
+# ===================================================================
+# tcc_link.txt - TRDOS 386 NÝHAÝ SIFIR KAYMALI FLAT LINKER REÇETESÝ
+# ===================================================================
+format raw bin
+name TCC.PRG
+
+# Giriþ Noktasý (Entry Point) Kilitlemesi
+option start=_start
+option quiet
+
+# Girdi Nesne Dosyalarý (Giriþ Segmenti En Baþta Kalacak!)
+file libc/crt0.o
+file tcc.o
+
+# Kütüphane Grubu Nesneleri
+file libc/memset.o, libc/memcpy.o, libc/strlen.o, libc/strcmp.o
+file libc/strcpy.o, libc/memcmp.o, libc/strchr.o, libc/strrchr.o
+file libc/memmove.o, libc/strncmp.o, libc/chkstk.o, libc/gcc_stubs.o
+file libc/strcat.o, libc/atoi.o, libc/strpbrk.o, libc/libc_core.o
+file libc/libc_support.o, libc/lseek.o, libc/tell.o, libc/open.o
+file libc/close.o, libc/read.o, libc/write.o, libc/sbrk.o
+file libc/math64.o, libc/mingw_hack.o, libc/libc_printf_bridge.o
+file libc/libc_itoa.o, libc/libc_realloc.o
+
+# ===================================================================
+# WATCOM ALIAS ARMOR - MINGW KÖPRÜLEME VE BSS SEÇENEKLERÝ
+# ===================================================================
+
+# 1. crt0.o'nun aradýðý _bss_start adresini Watcom'un veri sonu sembolüne eþitle
+alias _bss_start = _edata
+
+# 2. tcc.o'nun aradýðý eksik printf varyasyonlarýný Assembly köprülerimize baðla
+alias ___mingw_vfprintf = _vfprintf
+alias ___mingw_vprintf  = _vprintf
+alias ___mingw_vsprintf = _vsprintf
+alias __vsnprintf       = _vsnprintf
+alias __snprintf        = _snprintf
+alias snprintf          = _snprintf
+alias vsnprintf         = _vsnprintf
