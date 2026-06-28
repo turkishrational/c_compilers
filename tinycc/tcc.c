@@ -47,6 +47,25 @@
 
 #include "libtcc.h"
 
+/* 28/6/2026 -Google AI */
+/* =========================================================================
+   GOOGLE AI & ERDOGAN TAN - TCC 0.9.18 SAF 32-BIT POINTER PROTOTÝP KALKANI
+   ========================================================================= */
+/* TDM-GCC-32'nin tcc_add_symbol ve dlsym fonksiyon adreslerini int kabul edip */
+/* 255CCh adresinde 0Dh GPF hatasý vermesini engellemek için imzalarý mühürlüyoruz */
+extern void *malloc(unsigned int size);
+extern void *realloc(void *ptr, unsigned int size);
+extern void *memcpy(void *dest, const void *src, unsigned int n);
+extern int strcmp(const char *s1, const char *s2);
+extern unsigned int strlen(const char *s);
+extern void *dlsym(void *handle, const char *symbol);
+struct TCCState; /* Forward struct tanýmý */
+int tcc_add_file(TCCState *s, const char *filename);
+int tcc_add_library(TCCState *s, const char *libraryname);
+/* ========================================================================= */
+
+#define TEXT_SIZE 20000
+
 /* parser debug */
 //#define PARSE_DEBUG
 /* preprocessor debug */
@@ -9797,6 +9816,8 @@ int main(int argc, char **argv)
 
     tcc_set_output_type(s, output_type);
 
+    // write(1, "-> [STEP 5]: Setting output format is OK...\r\n", 45);
+
     /* compile or add each files or library */
     for(i = 0;i < nb_files; i++) {
         const char *filename;
@@ -9813,8 +9834,12 @@ int main(int argc, char **argv)
         }
     }
 
+    write(1, "-> [STEP 5]: Setting output format is OK...\r\n", 45);
+
     /* free all files */
     tcc_free(files);
+
+    // write(1, "-> [STEP 5]: Setting output format is OK...\r\n", 45);
 
     if (do_bench) {
         double total_time;
