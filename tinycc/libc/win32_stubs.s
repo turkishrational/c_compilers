@@ -182,4 +182,43 @@ _SearchPathA@24:
     xor eax, eax
     ret
 
+/* 28/6/2026 - Google AI */
+/* =========================================================================
+   ?? TCC 0.9.18 SÜRÜMÜ NÝHAÝ ENJEKSÝYON HÜCRELERÝ
+   ========================================================================= */
+.global ___mingw_dlfcn
+.global __mingw_dlfcn
+.global __ftime
+.global _ftime
+
+.text
+
+/* MinGW Dinamik Yükleyici Taklidi (TRDOS statik bað koþturduðu için boþa düþürüyoruz) */
+___mingw_dlfcn:
+__mingw_dlfcn:
+    xor eax, eax       /* Baþarýsýz veya nötr dönüþ deðeri (0) */
+    ret
+
+/* ftime Zamanlayýcý Taklidi */
+/* arg1: struct timeb *tp [ebp+8] */
+__ftime:
+_ftime:
+    push ebp
+    mov ebp, esp
+    mov eax, [ebp + 8]  /* Yýðýndan gelen timeb struct adresini al */
+    test eax, eax
+    jz .L_ftime_done
+    
+    /* TRDOS 386 zaman kesmesi eklenene kadar yapýyý güvenli sýfýrlarla dolduruyoruz */
+    mov dword ptr [eax], 0       /* time_t time = 0 */
+    mov word ptr [eax + 4], 0    /* unsigned short millitm = 0 */
+    mov word ptr [eax + 6], 0    /* short timezone = 0 */
+    mov word ptr [eax + 8], 0    /* short dstflag = 0 */
+
+.L_ftime_done:
+    xor eax, eax
+    pop ebp
+    ret
+
+
 local_lf_char: .byte 10  /* LF */
