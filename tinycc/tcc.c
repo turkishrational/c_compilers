@@ -9512,7 +9512,68 @@ int main(int argc, char **argv)
     const char *optarg, *p1, *r1, *outfile;
     int print_search_dirs;
 
+    /* 28/6/2026 - Google AI */
+    /* =========================================================================
+       GOOGLE AI & ERDOGAN TAN - SAF HAM SYSTEM CALL LOG VE TAHLÝYE KALKANI
+       ========================================================================= */
+    /* Makro ve standart kütüphane tampon sýzýntýlarýný ezmek için */
+    /* doðrudan kütüphanenizdeki yerleþik saf write fonksiyonunu prototipliyoruz */
+    extern int write(int fd, const void *buf, unsigned int count);
+
+    /* 1. DURUM: Salt 'tcc' (Parametresiz) çaðrýsý yapýldýysa */
+    if (argc == 1) {
+        write(1, "Tiny C Compiler version 0.9.18 for TRDOS 386\r\n", 46);
+        write(1, "Usage: tcc [options] [infile1] [infile2]...\r\n", 45);
+        write(1, "Options:\r\n", 10);
+        write(1, "  -c          compile only (produce .o object file)\r\n", 53);
+        write(1, "  -o outfile  set output file name\r\n", 37);
+        write(1, "  -v          display tcc version\r\n", 35);
+        
+        /* TRDOS Zorlu Tahliye (Forced Exit) Kesmesi */
+        __asm__ __volatile__ (
+            ".intel_syntax noprefix\n"
+            "mov ebx, 0\n"
+            "mov eax, 1\n" /* sys_exit (1) */
+            "int 0x40\n"
+            ".att_syntax\n"
+        );
+        return 0;
+    }
+
+    /* 2. DURUM: Hatalý parametre korumasý (tcc -p test.c) */
+    /* Döngüye girmeden önce argv[1]'in ilk iki karakterini kontrol ediyoruz */
+    if (argc > 1 && argv[1] != NULL && argv[1][0] == '-') {
+        char opt = argv[1][1];
+        if (opt != 'c' && opt != 'o' && opt != 'v' && opt != '\0') {
+            write(1, "tcc: error: invalid option\r\n", 28);
+            
+            /* Güvenli Tahliye */
+            __asm__ __volatile__ (
+                ".intel_syntax noprefix\n"
+                "mov ebx, 1\n"
+                "mov eax, 1\n" /* sys_exit */
+                "int 0x40\n"
+                ".att_syntax\n"
+            );
+            return 1;
+        }
+    }
+    /* ========================================================================= */
+
+    write(1, "-> [STEP 1]: Entering tcc_new() core initialization...\r\n", 56);
+    
     s = tcc_new();
+
+    if (!s) {
+
+        write(1, "   [FAIL]: tcc_new() returned NULL context!\r\n", 45);
+
+        return 1;
+
+    }
+
+    write(1, "-> [STEP 2]: tcc_new() passed successfully.\r\n", 45);
+
     output_type = TCC_OUTPUT_EXE;
 
     optind = 1;
@@ -9531,11 +9592,19 @@ int main(int argc, char **argv)
             else
                 break;
         }
+
+        /* 0.9.18 parametre ayýklama ve ön hazýrlýk rutinleri */
+
+        write(1, "-> [STEP 3]: Parsing command line options...\r\n", 46);
+
         r = argv[optind++];
         if (r[0] != '-') {
             /* add a new file */
-            dynarray_add((void ***)&files, &nb_files, r);
-            if (!multiple_files) {
+             dynarray_add((void ***)&files, &nb_files, r);
+
+             write(1, "-> [STEP 3]: dynarray_add() passed successfully.\r\n", 50);
+
+             if (!multiple_files) {
                 optind--;
                 /* argv[0] will be this file */
                 break;
@@ -9558,6 +9627,7 @@ int main(int argc, char **argv)
                 }
                 popt++;
             }
+
         option_found:
             if (popt->flags & TCC_OPTION_HAS_ARG) {
                 if (*r1 != '\0' || (popt->flags & TCC_OPTION_NOSEP)) {
@@ -9575,15 +9645,18 @@ int main(int argc, char **argv)
                 
             switch(popt->index) {
             case TCC_OPTION_HELP:
+                 write(1, "-> [STEP 4]: Option: HELP\r\n", 27);
             show_help:
                 help();
                 return 1;
             case TCC_OPTION_I:
+                 write(1, "-> [STEP 4]: Option: INCLUDE\r\n", 30);
                 if (tcc_add_include_path(s, optarg) < 0)
                     error("too many include paths");
                 break;
             case TCC_OPTION_D:
                 {
+                    write(1, "-> [STEP 4]: Option: DEFINE\r\n", 29);
                     char *sym, *value;
                     sym = (char *)optarg;
                     value = strchr(sym, '=');
@@ -9595,23 +9668,29 @@ int main(int argc, char **argv)
                 }
                 break;
             case TCC_OPTION_U:
+                write(1, "-> [STEP 4]: Option: UNDEFINE\r\n", 31);
                 tcc_undefine_symbol(s, optarg);
                 break;
             case TCC_OPTION_L:
+                write(1, "-> [STEP 4]: Option: LIBRARY\r\n", 30);  
                 tcc_add_library_path(s, optarg);
                 break;
             case TCC_OPTION_B:
                 /* set tcc utilities path (mainly for tcc development) */
+                write(1, "-> [STEP 4]: Option: B\r\n", 24);
                 tcc_lib_path = optarg;
                 break;
             case TCC_OPTION_l:
+                write(1, "-> [STEP 4]: Option: l", 24);
                 dynarray_add((void ***)&files, &nb_files, r);
                 nb_libraries++;
                 break;
             case TCC_OPTION_bench:
+                write(1, "-> [STEP 4]: Option: BENCH\r\n", 28);
                 do_bench = 1;
                 break;
             case TCC_OPTION_bt:
+                write(1, "-> [STEP 4]: Option: bt\r\n", 25);
                 num_callers = atoi(optarg);
                 break;
 #ifdef CONFIG_TCC_BCHECK
@@ -9621,41 +9700,52 @@ int main(int argc, char **argv)
                 break;
 #endif
             case TCC_OPTION_g:
+                write(1, "-> [STEP 4]: Option: g\r\n", 24);
                 do_debug = 1;
                 break;
             case TCC_OPTION_c:
+                write(1, "-> [STEP 4]: Option: c\r\n", 24);
                 multiple_files = 1;
                 output_type = TCC_OUTPUT_OBJ;
                 break;
             case TCC_OPTION_static:
+                write(1, "-> [STEP 4]: Option: STATIC\r\n", 29);
                 s->static_link = 1;
                 break;
             case TCC_OPTION_shared:
+                write(1, "-> [STEP 4]: Option: DLL\r\n", 26);
                 output_type = TCC_OUTPUT_DLL;
                 break;
             case TCC_OPTION_o:
+                write(1, "-> [STEP 4]: Option: o\r\n", 24);
                 multiple_files = 1;
                 outfile = optarg;
                 break;
             case TCC_OPTION_r:
+                write(1, "-> [STEP 4]: Option: r\r\n", 24);
                 /* generate a .o merging several output files */
                 reloc_output = 1;
                 output_type = TCC_OUTPUT_OBJ;
                 break;
             case TCC_OPTION_nostdinc:
+                write(1, "-> [STEP 4]: Option: nostdinc\r\n", 31);
                 s->nostdinc = 1;
                 break;
             case TCC_OPTION_print_search_dirs:
+                write(1, "-> [STEP 4]: Option: search_dirs\r\n", 34);  
                 print_search_dirs = 1;
                 break;
             case TCC_OPTION_run:
+                write(1, "-> [STEP 4]: Option: RUN\r\n", 26);
                 multiple_files = 0;
                 output_type = TCC_OUTPUT_MEMORY;
                 break;
             case TCC_OPTION_v:
+                write(1, "-> [STEP 4]: Option: VERSION\r\n", 30);
                 printf("tcc version %s\n", TCC_VERSION);
                 return 0;
             default:
+                write(1, "-> [STEP 4]: Option: DEFAULT\r\n", 30);
                 break;
             }
         }
@@ -9703,6 +9793,8 @@ int main(int argc, char **argv)
         start_time = getclock_us();
     }
 
+    write(1, "-> [STEP 5]: Setting output format to MEM/PRG...\r\n", 50);
+
     tcc_set_output_type(s, output_type);
 
     /* compile or add each files or library */
@@ -9737,6 +9829,8 @@ int main(int argc, char **argv)
                total_bytes / total_time / 1000000.0); 
     }
 
+     write(1, "-> [STEP 6]: Compiling target source file...\r\n", 46);
+
     if (s->output_type != TCC_OUTPUT_MEMORY) {
         tcc_output_file(s, outfile);
         ret = 0;
@@ -9753,6 +9847,8 @@ int main(int argc, char **argv)
         printf("memory: %d bytes, max = %d bytes\n", mem_cur_size, mem_max_size);
     }
 #endif
+    write(1, "-> [STEP 7]: OK!\r\n", 19);
+
     return ret;
 }
 
