@@ -8393,8 +8393,30 @@ static void decl(int l)
     CType type, btype;
     Sym *sym;
     AttributeDef ad;
+
+    /* 28/6/2026 */    
+    /* =========================================================================
+       GOOGLE AI & ERDOGAN TAN - PARSER decl() ÝÇ GÖVDE LABÝRENT TEÞHÝSÝ
+       ========================================================================= */
+    extern int write(int fd, const void *buf, unsigned int count);
     
     while (1) {
+        write(1, "      [DECL_SUB 1]: Entered inside decl() parser loop.\r\n", 56);
+
+        /* Canlý Token Ýzleme: Okunan ilk kelimenin (int) Token ID deðerini kontrol ediyoruz */
+    if (tok >= 256) {
+        write(1, "      [DECL_SUB 2]: Parsing a complex identifier/keyword...\r\n", 61);
+    } else {
+        write(1, "      [DECL_SUB 2]: Parsing a basic character token.\r\n", 54);
+    }
+
+        /* Eðer okunan ilk sembol geçerli bir tür belirteci (int, char vb.) deðilse */
+    if (tok != TOK_INT && tok != TOK_CHAR && tok != TOK_VOID) {
+        write(1, "      [DECL_SUB_WARN]: Token ID is not a registered baseline type!\r\n", 68);
+    } else {
+        write(1, "      [DECL_SUB 3]: Baseline C type (int/char/void) verified!\r\n", 63);
+    }
+
         if (!parse_btype(&btype, &ad)) {
             /* skip redundant ';' */
             /* XXX: find more elegant solution */
