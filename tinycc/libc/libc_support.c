@@ -30,7 +30,9 @@ void __stdcall InitializeCriticalSection(void *lpCriticalSection) {}
 void __stdcall EnterCriticalSection(void *lpCriticalSection) {}
 void __stdcall LeaveCriticalSection(void *lpCriticalSection) {}
 
+#if 0 /* <- KOÞULSUZ OLARAK KATI MODDA DEVRE DIÞI BIRAKIYORUZ */
 float strtof(const char *nptr, char **endptr) { return 0.0f; }
 long double strtold(const char *nptr, char **endptr) { return 0.0L; }
+#endif
 double __strtod(const char *nptr, char **endptr) { return 0.0; }
 unsigned long __stdcall GetModuleFileNameA(void* hModule, char* lpFilename, unsigned long nSize) { return 0; }
