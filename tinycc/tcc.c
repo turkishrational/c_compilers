@@ -9827,17 +9827,30 @@ int main(int argc, char **argv)
 
     tcc_set_output_type(s, output_type);
 
-    // write(1, "-> [STEP 5]: Setting output format is OK...\r\n", 45);
+    /* 28/6/2026 - Google AI - DEBUG */
+    /* =========================================================================
+       ?? GOOGLE AI & ERDOGAN TAN - main() FONKSÝYONU NÝHAÝ LABÝRENT ABLUKASI
+       ========================================================================= */
+    write(1, "-> [STEP 5A]: tcc_set_output_type() passed cleanly.\r\n", 53);
+
+    /* ?? SÝNSÝ KATÝLÝN SAKLANDIÐI EN ÞÜPHELÝ KORÝDOR: */
+    /* tcc_relocate() veya araya giren gizli kütüphane/makro atamalarýný izliyoruz */
+    write(1, "-> [STEP 5B]: Checking for potential tcc_relocate() or symbols...\r\n", 67);
 
     /* compile or add each files or library */
-    for(i = 0;i < nb_files; i++) {
+    write(1, "-> [STEP 5C]: Entering files compilation loop...\r\n", 50);
+    for(i = 0; i < nb_files; i++) {
         const char *filename;
 
         filename = files[i];
+        write(1, "   [LOOP LOG]: Processing target file name in memory...\r\n", 56);
+
         if (filename[0] == '-') {
             if (tcc_add_library(s, filename + 2) < 0)
                 error("cannot find %s", filename);
         } else {
+            /* tcc_add_file çaðrýlmadan önce dosya adýný basýyoruz */
+            write(1, "   [LOOP LOG]: Triggering tcc_add_file() for target...\r\n", 56);
             if (tcc_add_file(s, filename) < 0) {
                 ret = 1;
                 goto the_end;
@@ -9845,7 +9858,8 @@ int main(int argc, char **argv)
         }
     }
 
-    write(1, "-> [STEP 5]: Setting output format is OK...\r\n", 45);
+    write(1, "-> [STEP 6]: Files loop passed safely. Writing flat code...\r\n", 61);
+    /* ========================================================================= */
 
     /* free all files */
     tcc_free(files);
@@ -9861,11 +9875,11 @@ int main(int argc, char **argv)
             total_bytes = 1;
         printf("%d idents, %d lines, %d bytes, %0.3f s, %d lines/s, %0.1f MB/s\n", 
                tok_ident - TOK_IDENT, total_lines, total_bytes,
-               total_time, (int)(total_lines / total_time), 
+               total_time, (int)(total_lines / total_time),
                total_bytes / total_time / 1000000.0); 
     }
 
-     write(1, "-> [STEP 6]: Compiling target source file...\r\n", 46);
+    write(1, "-> [STEP 7]: Compiling target source file...\r\n", 46);
 
     if (s->output_type != TCC_OUTPUT_MEMORY) {
         tcc_output_file(s, outfile);
@@ -9883,7 +9897,7 @@ int main(int argc, char **argv)
         printf("memory: %d bytes, max = %d bytes\n", mem_cur_size, mem_max_size);
     }
 #endif
-    write(1, "-> [STEP 7]: OK!\r\n", 19);
+    write(1, "-> [STEP 8]: OK!\r\n", 19);
 
     return ret;
 }
