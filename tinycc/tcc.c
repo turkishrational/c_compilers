@@ -9350,56 +9350,67 @@ int tcc_add_symbol(TCCState *s, const char *name, unsigned long val)
     return 0;
 }
 
+/* 28/6/2026 - Google AI & Erdogan Tan */
+/* =========================================================================
+   GOOGLE AI & ERDOGAN TAN - ARINDIRILMIÞ tcc_set_output_type LABÝRENT MOTORU
+   ========================================================================= */
 int tcc_set_output_type(TCCState *s, int output_type)
 {
     char buf[1024];
+    extern int write(int fd, const void *buf, unsigned int count);
 
+    write(1, "   [SUB_LOG 1]: Inside tcc_set_output_type(), configuring state...\r\n", 67);
     s->output_type = output_type;
 
     if (!s->nostdinc) {
-        /* default include paths */
-        /* XXX: reverse order needed if -isystem support */
-        tcc_add_sysinclude_path(s, "/usr/local/include");
-        tcc_add_sysinclude_path(s, "/usr/include");
+        /* TRDOS 386 Dosya yapýsýyla çeliþebilecek Linux yollarý pasifleþtirildi */
+        /* tcc_add_sysinclude_path(s, "/usr/local/include"); */
+        /* tcc_add_sysinclude_path(s, "/usr/include"); */
+        
         snprintf(buf, sizeof(buf), "%s/include", tcc_lib_path);
         tcc_add_sysinclude_path(s, buf);
+    }
+
+    if (output_type == TCC_OUTPUT_MEMORY) {
+        write(1, "   [SUB_LOG 2]: Output is TCC_OUTPUT_MEMORY. Allocating runtime...\r\n", 67);
+        
+        /* ?? ÝÞTE EN ÞÜPHELÝ ALAN: tcc_add_runtime fonksiyon çaðrýsý! */
+        write(1, "   [SUB_LOG 3]: Triggering tcc_add_runtime(s) built-in symbols...\r\n", 67);
+        tcc_add_runtime(s);
+        write(1, "   [SUB_LOG 4]: tcc_add_runtime(s) completed safely.\r\n", 54);
     }
 
     /* if bound checking, then add corresponding sections */
 #ifdef CONFIG_TCC_BCHECK
     if (do_bounds_check) {
-        /* define symbol */
         tcc_define_symbol(s, "__BOUNDS_CHECKING_ON", NULL);
-        /* create bounds sections */
-        bounds_section = new_section(s, ".bounds", 
-                                     SHT_PROGBITS, SHF_ALLOC);
-        lbounds_section = new_section(s, ".lbounds", 
-                                      SHT_PROGBITS, SHF_ALLOC);
+        bounds_section = new_section(s, ".bounds", SHT_PROGBITS, SHF_ALLOC);
+        lbounds_section = new_section(s, ".lbounds", SHT_PROGBITS, SHF_ALLOC);
     }
 #endif
 
     /* add debug sections */
     if (do_debug) {
-        /* stab symbols */
         stab_section = new_section(s, ".stab", SHT_PROGBITS, 0);
         stab_section->sh_entsize = sizeof(Stab_Sym);
         stabstr_section = new_section(s, ".stabstr", SHT_STRTAB, 0);
         put_elf_str(stabstr_section, "");
         stab_section->link = stabstr_section;
-        /* put first entry */
         put_stabs("", 0, 0, 0, 0);
     }
 
-    /* add libc crt1/crti objects */
-    if (output_type == TCC_OUTPUT_EXE || 
-        output_type == TCC_OUTPUT_DLL) {
+    /* add libc crt1/crti objects (TRDOS saf crt0.s kullandýðý için pas geçiliyor) */
+    if (output_type == TCC_OUTPUT_EXE || output_type == TCC_OUTPUT_DLL) {
         if (output_type != TCC_OUTPUT_DLL) {
-            // tcc_add_file(s, CONFIG_TCC_CRT_PREFIX "/crt1.o");
-        }   
-        // tcc_add_file(s, CONFIG_TCC_CRT_PREFIX "/crti.o");
+            /* tcc_add_file(s, CONFIG_TCC_CRT_PREFIX "/crt1.o"); */
+        }
+        /* tcc_add_file(s, CONFIG_TCC_CRT_PREFIX "/crti.o"); */
     }
+
+    write(1, "   [SUB_LOG 5]: Exiting tcc_set_output_type() successfully.\r\n", 61);
     return 0;
 }
+/* ========================================================================= */
 
 #if !defined(LIBTCC)
 
