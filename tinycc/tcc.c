@@ -56,7 +56,9 @@
 #undef vprintf
 
 /* Sizin kütüphanenizdeki gerçek global _printf imzasýný prototipliyoruz */
-extern int printf(const char *format, ...);
+// extern int printf(const char *format, ...);
+extern int trdos_print(const char *format, ...);
+#define printf trdos_print
 
 /* Eðer koddaki fputs veya fprintf çaðrýlarý da stderr tamponuna kaçýyorsa */
 /* onlarý da doðrudan bizim kararlý printf köprümüz üzerinden eritiyoruz */
