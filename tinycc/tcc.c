@@ -45,6 +45,27 @@
 #include <dlfcn.h>
 #endif
 
+/* 29/6/2026 */
+/* =========================================================================
+   GOOGLE AI & ERDOGAN TAN - Flat PRINTF RE-ROUTE (MAKRO EZME MÜHRÜ)
+   ========================================================================= */
+/* TDM-GCC ve MinGW baþlýk dosyalarýndan sýzan tüm gizli printf makrolarýný */
+/* iptal edip, doðrudan kütüphanemizdeki libc_print_bridge.s içindeki */
+/* saf ve kararlý _printf assembler köprümüze zorla yönlendiriyoruz! */
+#undef printf
+#undef vprintf
+
+/* Sizin kütüphanenizdeki gerçek global _printf imzasýný prototipliyoruz */
+extern int printf(const char *format, ...);
+
+/* Eðer koddaki fputs veya fprintf çaðrýlarý da stderr tamponuna kaçýyorsa */
+/* onlarý da doðrudan bizim kararlý printf köprümüz üzerinden eritiyoruz */
+#undef fprintf
+#define fprintf(stream, fmt, ...) printf(fmt, ##__VA_ARGS__)
+#undef fputs
+#define fputs(str, stream) printf("%s", str)
+/* ========================================================================= */
+
 #include "libtcc.h"
 
 /* 28/6/2026 -Google AI */
@@ -9596,7 +9617,6 @@ int main(int argc, char **argv)
     /* doðrudan kütüphanenizdeki yerleþik saf write fonksiyonunu prototipliyoruz */
     extern int write(int fd, const void *buf, unsigned int count);
 
-    /* 1. DURUM: Salt 'tcc' (Parametresiz) çaðrýsý yapýldýysa */
     if (argc == 1) {
         write(1, "Tiny C Compiler version 0.9.18 for TRDOS 386\r\n", 46);
         write(1, "Usage: tcc [options] [infile1] [infile2]...\r\n", 45);
@@ -9616,24 +9636,6 @@ int main(int argc, char **argv)
         return 0;
     }
 
-    /* 2. DURUM: Hatalý parametre korumasý (tcc -p test.c) */
-    /* Döngüye girmeden önce argv[1]'in ilk iki karakterini kontrol ediyoruz */
-    if (argc > 1 && argv[1] != NULL && argv[1][0] == '-') {
-        char opt = argv[1][1];
-        if (opt != 'c' && opt != 'o' && opt != 'v' && opt != '\0') {
-            write(1, "tcc: error: invalid option\r\n", 28);
-            
-            /* Güvenli Tahliye */
-            __asm__ __volatile__ (
-                ".intel_syntax noprefix\n"
-                "mov ebx, 1\n"
-                "mov eax, 1\n" /* sys_exit */
-                "int 0x40\n"
-                ".att_syntax\n"
-            );
-            return 1;
-        }
-    }
     /* ========================================================================= */
 
     write(1, "-> [STEP 1]: Entering tcc_new() core initialization...\r\n", 56);
@@ -9685,23 +9687,39 @@ int main(int argc, char **argv)
                 /* argv[0] will be this file */
                 break;
             }
-        } else {
-            /* find option in table (match only the first chars */
+} else {
+            /* 28/6/2026 */		
+            /* =========================================================================
+               GOOGLE AI & ERDOGAN TAN - SAF FLAT PARAMETRE AYIKLAMA MOTORU
+               ========================================================================= */
             popt = tcc_options;
+            r1 = r + 1; /* '-' karakterini atla, saf seçeneði al (h, v, c, o vb.) */
+
             for(;;) {
                 p1 = popt->name;
-                if (p1 == NULL)
+                
+                /* Tablo sonuna gelindiyse parametre bulunamamýþtýr */
+                if (p1 == NULL) {
                     error("invalid option -- '%s'", r);
-                r1 = r + 1;
-                for(;;) {
-                    if (*p1 == '\0')
-                        goto option_found;
-                    if (*r1 != *p1)
-                        break;
-                    p1++;
-                    r1++;
                 }
-                popt++;
+
+                /* Harici string baðýmlýlýðý olmadan, p1 ve r1 dizgelerini el ile karakter karakter kýyaslýyoruz */
+                char *s1 = (char *)p1;
+                char *s2 = (char *)r1;
+                
+                while (*s1 && (*s1 == *s2)) {
+                    s1++;
+                    s2++;
+                }
+
+                /* Eðer tablodaki kelime bittiyse ve eþleþtiyse zafer! */
+                if (*s1 == '\0') {
+                    /* r1 iþaretçisini parametrenin bittiði yere kaydýrýyoruz (Örn: -Ipath için argümana yönlenmesi için) */
+                    r1 = s2; 
+                    goto option_found;
+                }
+
+                popt++; /* Hizalama hatasýndan etkilenmeden bir sonraki seçeneðe güvenle geç */
             }
 
         option_found:
