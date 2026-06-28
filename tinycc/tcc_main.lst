@@ -1,0 +1,636 @@
+﻿0CE71                 align 4
+0CE74
+0CE74 ; =============== S U B R O U T I N E =======================================
+0CE74
+0CE74 ; Attributes: bp-based frame fuzzy-sp
+0CE74
+0CE74 ; int __cdecl main(int argc, const char **argv, const char **envp)
+0CE74 _main           proc near               ; CODE XREF: 0001E↑p
+0CE74
+0CE74 var_4A8         = dword ptr -4A8h
+0CE74 var_4A4         = dword ptr -4A4h
+0CE74 var_4A0         = dword ptr -4A0h
+0CE74 var_49C         = dword ptr -49Ch
+0CE74 var_498         = qword ptr -498h
+0CE74 var_490         = dword ptr -490h
+0CE74 var_48C         = qword ptr -48Ch
+0CE74 var_484         = qword ptr -484h
+0CE74 var_47C         = word ptr -47Ch
+0CE74 var_47A         = word ptr -47Ah
+0CE74 var_478         = byte ptr -478h
+0CE74 var_78          = dword ptr -78h
+0CE74 var_74          = dword ptr -74h
+0CE74 var_70          = dword ptr -70h
+0CE74 var_6C          = dword ptr -6Ch
+0CE74 var_68          = dword ptr -68h
+0CE74 var_64          = dword ptr -64h
+0CE74 var_60          = dword ptr -60h
+0CE74 var_5C          = dword ptr -5Ch
+0CE74 var_58          = dword ptr -58h
+0CE74 var_54          = qword ptr -54h
+0CE74 var_48          = dword ptr -48h
+0CE74 var_44          = dword ptr -44h
+0CE74 var_40          = dword ptr -40h
+0CE74 var_3C          = dword ptr -3Ch
+0CE74 var_38          = dword ptr -38h
+0CE74 var_34          = dword ptr -34h
+0CE74 var_30          = dword ptr -30h
+0CE74 var_2C          = dword ptr -2Ch
+0CE74 var_28          = dword ptr -28h
+0CE74 var_20          = dword ptr -20h
+0CE74 var_1C          = dword ptr -1Ch
+0CE74 var_18          = dword ptr -18h
+0CE74 var_14          = dword ptr -14h
+0CE74 var_10          = dword ptr -10h
+0CE74 var_C           = dword ptr -0Ch
+0CE74 var_8           = dword ptr -8
+0CE74 var_4           = dword ptr -4
+0CE74 argc            = dword ptr  8
+0CE74 argv            = dword ptr  0Ch
+0CE74 envp            = dword ptr  10h
+0CE74
+0CE74                 push    ebp
+0CE75                 mov     ebp, esp
+0CE77                 push    ebx
+0CE78                 and     esp, 0FFFFFFF8h
+0CE7B                 sub     esp, 4A4h
+0CE81                 call    nullsub_1
+0CE86                 mov     [esp+4A8h+var_2C], 0
+0CE91                 mov     [esp+4A8h+var_28], 0
+0CE9C                 call    sub_15A04
+0CEA1                 mov     [esp+4A8h+var_58], eax
+0CEA8                 mov     [esp+4A8h+var_C], 1
+0CEB3                 mov     [esp+4A8h+var_8], 1
+0CEBE                 mov     [esp+4A8h+var_40], 0
+0CEC9                 mov     [esp+4A8h+var_10], 1
+0CED4                 mov     [esp+4A8h+var_5C], 0
+0CEDF                 mov     [esp+4A8h+var_74], 0
+0CEEA                 mov     [esp+4A8h+var_78], 0
+0CEF5                 mov     [esp+4A8h+var_1C], 0
+0CF00                 mov     [esp+4A8h+var_18], 0
+0CF0B                 mov     [esp+4A8h+var_44], 0
+0CF16
+0CF16 loc_CF16:                               ; CODE XREF: _main+131↓j
+0CF16                                         ; _main+4D6↓j ...
+0CF16                 mov     eax, [esp+4A8h+var_8]
+0CF1D                 cmp     eax, [ebp+argc]
+0CF20                 jl      short loc_CF44
+0CF22                 mov     eax, [esp+4A8h+var_78]
+0CF29                 test    eax, eax
+0CF2B                 jnz     loc_D355
+0CF31                 cmp     [esp+4A8h+var_44], 0
+0CF39                 jnz     loc_D355
+0CF3F                 jmp     loc_D119        ; jumptable 0000D116 case 0
+0CF44
+0CF44 loc_CF44:                               ; CODE XREF: _main+AC↑j
+0CF44                 mov     eax, [esp+4A8h+var_8]
+0CF4B                 lea     edx, [eax+1]
+0CF4E                 mov     [esp+4A8h+var_8], edx
+0CF55                 lea     edx, ds:0[eax*4]
+0CF5C                 mov     eax, [ebp+argv]
+0CF5F                 add     eax, edx
+0CF61                 mov     eax, [eax]
+0CF63                 mov     [esp+4A8h+var_60], eax
+0CF6A                 mov     eax, [esp+4A8h+var_60]
+0CF71                 movzx   eax, byte ptr [eax]
+0CF74                 cmp     al, 2Dh ; '-'
+0CF76                 jz      short loc_CFB8
+0CF78                 mov     eax, [esp+4A8h+var_60]
+0CF7F                 mov     [esp+4A8h+var_4A0], eax
+0CF83                 lea     eax, [esp+4A8h+var_78]
+0CF8A                 mov     [esp+4A8h+var_4A4], eax
+0CF8E                 lea     eax, [esp+4A8h+var_74]
+0CF95                 mov     [esp+4A8h+var_4A8], eax
+0CF98                 call    sub_5B5C
+0CF9D                 cmp     [esp+4A8h+var_10], 0
+0CFA5                 jnz     loc_CF16
+0CFAB                 sub     [esp+4A8h+var_8], 1
+0CFB3                 jmp     loc_D355
+0CFB8
+0CFB8 loc_CFB8:                               ; CODE XREF: _main+102↑j
+0CFB8                 mov     [esp+4A8h+var_30], offset off_1EAE0
+0CFC3
+0CFC3 loc_CFC3:                               ; CODE XREF: _main+1D2↓j
+0CFC3                 mov     eax, [esp+4A8h+var_30]
+0CFCA                 mov     eax, [eax]
+0CFCC                 mov     [esp+4A8h+var_38], eax
+0CFD3                 cmp     [esp+4A8h+var_38], 0
+0CFDB                 jnz     short loc_CFF4
+0CFDD                 mov     eax, [esp+4A8h+var_60]
+0CFE4                 mov     [esp+4A8h+var_4A4], eax
+0CFE8                 mov     [esp+4A8h+var_4A8], offset aInvalidOptionS ; "invalid option -- '%s'"
+0CFEF                 call    sub_5C4C
+0CFF4
+0CFF4 loc_CFF4:                               ; CODE XREF: _main+167↑j
+0CFF4                 mov     eax, [esp+4A8h+var_60]
+0CFFB                 add     eax, 1
+0CFFE                 mov     [esp+4A8h+var_3C], eax
+0D005
+0D005 loc_D005:                               ; CODE XREF: _main+1C7↓j
+0D005                 mov     eax, [esp+4A8h+var_38]
+0D00C                 movzx   eax, byte ptr [eax]
+0D00F                 test    al, al
+0D011                 jz      short loc_D04B
+0D013                 mov     eax, [esp+4A8h+var_3C]
+0D01A                 movzx   edx, byte ptr [eax]
+0D01D                 mov     eax, [esp+4A8h+var_38]
+0D024                 movzx   eax, byte ptr [eax]
+0D027                 cmp     dl, al
+0D029                 jnz     short loc_D03D
+0D02B                 add     [esp+4A8h+var_38], 1
+0D033                 add     [esp+4A8h+var_3C], 1
+0D03B                 jmp     short loc_D005
+0D03D
+0D03D loc_D03D:                               ; CODE XREF: _main+1B5↑j
+0D03D                 nop
+0D03E                 add     [esp+4A8h+var_30], 8
+0D046                 jmp     loc_CFC3
+0D04B
+0D04B loc_D04B:                               ; CODE XREF: _main+19D↑j
+0D04B                 nop
+0D04C                 mov     eax, [esp+4A8h+var_30]
+0D053                 movzx   eax, word ptr [eax+6]
+0D057                 movzx   eax, ax
+0D05A                 and     eax, 1
+0D05D                 test    eax, eax
+0D05F                 jz      short loc_D0DF
+0D061                 mov     eax, [esp+4A8h+var_3C]
+0D068                 movzx   eax, byte ptr [eax]
+0D06B                 test    al, al
+0D06D                 jnz     short loc_D084
+0D06F                 mov     eax, [esp+4A8h+var_30]
+0D076                 movzx   eax, word ptr [eax+6]
+0D07A                 movzx   eax, ax
+0D07D                 and     eax, 2
+0D080                 test    eax, eax
+0D082                 jz      short loc_D094
+0D084
+0D084 loc_D084:                               ; CODE XREF: _main+1F9↑j
+0D084                 mov     eax, [esp+4A8h+var_3C]
+0D08B                 mov     [esp+4A8h+var_34], eax
+0D092                 jmp     short loc_D0F8
+0D094
+0D094 loc_D094:                               ; CODE XREF: _main+20E↑j
+0D094                 mov     eax, [esp+4A8h+var_8]
+0D09B                 cmp     eax, [ebp+argc]
+0D09E                 jl      short loc_D0B7
+0D0A0                 mov     eax, [esp+4A8h+var_60]
+0D0A7                 mov     [esp+4A8h+var_4A4], eax
+0D0AB                 mov     [esp+4A8h+var_4A8], offset aArgumentToSIsM ; "argument to '%s' is missing"
+0D0B2                 call    sub_5C4C
+0D0B7
+0D0B7 loc_D0B7:                               ; CODE XREF: _main+22A↑j
+0D0B7                 mov     eax, [esp+4A8h+var_8]
+0D0BE                 lea     edx, [eax+1]
+0D0C1                 mov     [esp+4A8h+var_8], edx
+0D0C8                 lea     edx, ds:0[eax*4]
+0D0CF                 mov     eax, [ebp+argv]
+0D0D2                 add     eax, edx
+0D0D4                 mov     eax, [eax]
+0D0D6                 mov     [esp+4A8h+var_34], eax
+0D0DD                 jmp     short loc_D0F8
+0D0DF
+0D0DF loc_D0DF:                               ; CODE XREF: _main+1EB↑j
+0D0DF                 mov     eax, [esp+4A8h+var_3C]
+0D0E6                 movzx   eax, byte ptr [eax]
+0D0E9                 test    al, al
+0D0EB                 jnz     short loc_D118
+0D0ED                 mov     [esp+4A8h+var_34], 0
+0D0F8
+0D0F8 loc_D0F8:                               ; CODE XREF: _main+21E↑j
+0D0F8                                         ; _main+269↑j
+0D0F8                 mov     eax, [esp+4A8h+var_30]
+0D0FF                 movzx   eax, word ptr [eax+4]
+0D103                 movzx   eax, ax
+0D106                 cmp     eax, 18h        ; switch 25 cases
+0D109                 ja      loc_D349        ; jumptable 0000D116 default case
+0D10F                 mov     eax, ds:off_1CCDC[eax*4]
+0D116                 jmp     eax             ; switch jump
+0D118
+0D118 loc_D118:                               ; CODE XREF: _main+277↑j
+0D118                 nop
+0D119
+0D119 loc_D119:                               ; CODE XREF: _main+CB↑j
+0D119                                         ; _main+2A2↑j
+0D119                                         ; DATA XREF: ...
+0D119                 call    sub_AF2C        ; jumptable 0000D116 case 0
+0D11E                 mov     eax, 1
+0D123                 jmp     loc_D736
+0D128
+0D128 loc_D128:                               ; CODE XREF: _main+2A2↑j
+0D128                                         ; DATA XREF: seg000:off_1CCDC↓o
+0D128                 mov     eax, [esp+4A8h+var_34] ; jumptable 0000D116 case 1
+0D12F                 mov     [esp+4A8h+var_4A4], eax
+0D133                 mov     eax, [esp+4A8h+var_58]
+0D13A                 mov     [esp+4A8h+var_4A8], eax
+0D13D                 call    sub_13DF4
+0D142                 test    eax, eax
+0D144                 jns     loc_D34F
+0D14A                 mov     [esp+4A8h+var_4A8], offset aTooManyInclude ; "too many include paths"
+0D151                 call    sub_5C4C
+0D156                 jmp     loc_D34F
+0D15B
+0D15B loc_D15B:                               ; CODE XREF: _main+2A2↑j
+0D15B                                         ; DATA XREF: seg000:off_1CCDC↓o
+0D15B                 mov     eax, [esp+4A8h+var_34] ; jumptable 0000D116 case 2
+0D162                 mov     [esp+4A8h+var_64], eax
+0D169                 mov     [esp+4A8h+var_4A4], 3Dh ; '='
+0D171                 mov     eax, [esp+4A8h+var_64]
+0D178                 mov     [esp+4A8h+var_4A8], eax
+0D17B                 call    sub_1B4
+0D180                 mov     [esp+4A8h+var_48], eax
+0D187                 cmp     [esp+4A8h+var_48], 0
+0D18F                 jz      short loc_D1A3
+0D191                 mov     eax, [esp+4A8h+var_48]
+0D198                 mov     byte ptr [eax], 0
+0D19B                 add     [esp+4A8h+var_48], 1
+0D1A3
+0D1A3 loc_D1A3:                               ; CODE XREF: _main+31B↑j
+0D1A3                 mov     eax, [esp+4A8h+var_48]
+0D1AA                 mov     [esp+4A8h+var_4A0], eax
+0D1AE                 mov     eax, [esp+4A8h+var_64]
+0D1B5                 mov     [esp+4A8h+var_4A4], eax
+0D1B9                 mov     eax, [esp+4A8h+var_58]
+0D1C0                 mov     [esp+4A8h+var_4A8], eax
+0D1C3                 call    sub_14634
+0D1C8                 jmp     loc_D350
+0D1CD
+0D1CD loc_D1CD:                               ; CODE XREF: _main+2A2↑j
+0D1CD                                         ; DATA XREF: seg000:off_1CCDC↓o
+0D1CD                 mov     eax, [esp+4A8h+var_34] ; jumptable 0000D116 case 3
+0D1D4                 mov     [esp+4A8h+var_4A4], eax
+0D1D8                 mov     eax, [esp+4A8h+var_58]
+0D1DF                 mov     [esp+4A8h+var_4A8], eax
+0D1E2                 call    sub_17660
+0D1E7                 jmp     loc_D350
+0D1EC
+0D1EC loc_D1EC:                               ; CODE XREF: _main+2A2↑j
+0D1EC                                         ; DATA XREF: seg000:off_1CCDC↓o
+0D1EC                 mov     eax, [esp+4A8h+var_34] ; jumptable 0000D116 case 4
+0D1F3                 mov     [esp+4A8h+var_4A4], eax
+0D1F7                 mov     eax, [esp+4A8h+var_58]
+0D1FE                 mov     [esp+4A8h+var_4A8], eax
+0D201                 call    sub_13F78
+0D206                 jmp     loc_D350
+0D20B
+0D20B loc_D20B:                               ; CODE XREF: _main+2A2↑j
+0D20B                                         ; DATA XREF: seg000:off_1CCDC↓o
+0D20B                 mov     eax, [esp+4A8h+var_34] ; jumptable 0000D116 case 5
+0D212                 mov     ds:off_2265C, eax
+0D217                 jmp     loc_D350
+0D21C
+0D21C loc_D21C:                               ; CODE XREF: _main+2A2↑j
+0D21C                                         ; DATA XREF: seg000:off_1CCDC↓o
+0D21C                 mov     eax, [esp+4A8h+var_60] ; jumptable 0000D116 case 6
+0D223                 mov     [esp+4A8h+var_4A0], eax
+0D227                 lea     eax, [esp+4A8h+var_78]
+0D22E                 mov     [esp+4A8h+var_4A4], eax
+0D232                 lea     eax, [esp+4A8h+var_74]
+0D239                 mov     [esp+4A8h+var_4A8], eax
+0D23C                 call    sub_5B5C
+0D241                 add     [esp+4A8h+var_1C], 1
+0D249                 jmp     loc_D350
+0D24E
+0D24E loc_D24E:                               ; CODE XREF: _main+2A2↑j
+0D24E                                         ; DATA XREF: seg000:off_1CCDC↓o
+0D24E                 mov     ds:dword_2046C, 1 ; jumptable 0000D116 case 7
+0D258                 jmp     loc_D350
+0D25D
+0D25D loc_D25D:                               ; CODE XREF: _main+2A2↑j
+0D25D                                         ; DATA XREF: seg000:off_1CCDC↓o
+0D25D                 mov     eax, [esp+4A8h+var_34] ; jumptable 0000D116 case 8
+0D264                 mov     [esp+4A8h+var_4A8], eax
+0D267                 call    sub_258
+0D26C                 mov     ds:dword_22624, eax
+0D271                 jmp     loc_D350
+0D276
+0D276 loc_D276:                               ; CODE XREF: _main+2A2↑j
+0D276                                         ; DATA XREF: seg000:off_1CCDC↓o
+0D276                 mov     ds:dword_20474, 1 ; jumptable 0000D116 case 10
+0D280                 jmp     loc_D350
+0D285
+0D285 loc_D285:                               ; CODE XREF: _main+2A2↑j
+0D285                                         ; DATA XREF: seg000:off_1CCDC↓o
+0D285                 mov     [esp+4A8h+var_10], 1 ; jumptable 0000D116 case 11
+0D290                 mov     [esp+4A8h+var_C], 3
+0D29B                 jmp     loc_D350
+0D2A0
+0D2A0 loc_D2A0:                               ; CODE XREF: _main+2A2↑j
+0D2A0                                         ; DATA XREF: seg000:off_1CCDC↓o
+0D2A0                 mov     eax, [esp+4A8h+var_58] ; jumptable 0000D116 case 12
+0D2A7                 mov     dword ptr [eax+5Ch], 1
+0D2AE                 jmp     loc_D350
+0D2B3
+0D2B3 loc_D2B3:                               ; CODE XREF: _main+2A2↑j
+0D2B3                                         ; DATA XREF: seg000:off_1CCDC↓o
+0D2B3                 mov     [esp+4A8h+var_C], 2 ; jumptable 0000D116 case 13
+0D2BE                 jmp     loc_D350
+0D2C3
+0D2C3 loc_D2C3:                               ; CODE XREF: _main+2A2↑j
+0D2C3                                         ; DATA XREF: seg000:off_1CCDC↓o
+0D2C3                 mov     [esp+4A8h+var_10], 1 ; jumptable 0000D116 case 14
+0D2CE                 mov     eax, [esp+4A8h+var_34]
+0D2D5                 mov     [esp+4A8h+var_40], eax
+0D2DC                 jmp     short loc_D350
+0D2DE
+0D2DE loc_D2DE:                               ; CODE XREF: _main+2A2↑j
+0D2DE                                         ; DATA XREF: seg000:off_1CCDC↓o
+0D2DE                 mov     [esp+4A8h+var_18], 1 ; jumptable 0000D116 case 15
+0D2E9                 mov     [esp+4A8h+var_C], 3
+0D2F4                 jmp     short loc_D350
+0D2F6
+0D2F6 loc_D2F6:                               ; CODE XREF: _main+2A2↑j
+0D2F6                                         ; DATA XREF: seg000:off_1CCDC↓o
+0D2F6                 mov     eax, [esp+4A8h+var_58] ; jumptable 0000D116 case 20
+0D2FD                 mov     dword ptr [eax+58h], 1
+0D304                 jmp     short loc_D350
+0D306
+0D306 loc_D306:                               ; CODE XREF: _main+2A2↑j
+0D306                                         ; DATA XREF: seg000:off_1CCDC↓o
+0D306                 mov     [esp+4A8h+var_44], 1 ; jumptable 0000D116 case 21
+0D311                 jmp     short loc_D350
+0D313
+0D313 loc_D313:                               ; CODE XREF: _main+2A2↑j
+0D313                                         ; DATA XREF: seg000:off_1CCDC↓o
+0D313                 mov     [esp+4A8h+var_10], 0 ; jumptable 0000D116 case 23
+0D31E                 mov     [esp+4A8h+var_C], 0
+0D329                 jmp     short loc_D350
+0D32B
+0D32B loc_D32B:                               ; CODE XREF: _main+2A2↑j
+0D32B                                         ; DATA XREF: seg000:off_1CCDC↓o
+0D32B                 mov     [esp+4A8h+var_4A4], offset a0918 ; jumptable 0000D116 case 24
+0D333                 mov     [esp+4A8h+var_4A8], offset aTccVersionS ; "tcc version %s\n"
+0D33A                 call    sub_11624
+0D33F                 mov     eax, 0
+0D344                 jmp     loc_D736
+0D349
+0D349 loc_D349:                               ; CODE XREF: _main+295↑j
+0D349                                         ; _main+2A2↑j
+0D349                                         ; DATA XREF: ...
+0D349                 nop                     ; jumptable 0000D116 default case
+0D34A                 jmp     loc_CF16
+0D34F
+0D34F loc_D34F:                               ; CODE XREF: _main+2D0↑j
+0D34F                                         ; _main+2E2↑j
+0D34F                 nop
+0D350
+0D350 loc_D350:                               ; CODE XREF: _main+354↑j
+0D350                                         ; _main+373↑j ...
+0D350                 jmp     loc_CF16
+0D355
+0D355 loc_D355:                               ; CODE XREF: _main+B7↑j
+0D355                                         ; _main+C5↑j ...
+0D355                 cmp     [esp+4A8h+var_44], 0
+0D35D                 jz      short loc_D37E
+0D35F                 mov     eax, ds:off_2265C
+0D364                 mov     [esp+4A8h+var_4A4], eax
+0D368                 mov     [esp+4A8h+var_4A8], offset aInstallS ; "install: %s/\n"
+0D36F                 call    sub_11624
+0D374                 mov     eax, 0
+0D379                 jmp     loc_D736
+0D37E
+0D37E loc_D37E:                               ; CODE XREF: _main+4E9↑j
+0D37E                 mov     eax, [esp+4A8h+var_78]
+0D385                 sub     eax, [esp+4A8h+var_1C]
+0D38C                 mov     [esp+4A8h+var_68], eax
+0D393                 cmp     [esp+4A8h+var_40], 0
+0D39B                 jz      short loc_D3B2
+0D39D                 cmp     [esp+4A8h+var_C], 0
+0D3A5                 jnz     short loc_D3B2
+0D3A7                 mov     [esp+4A8h+var_C], 1
+0D3B2
+0D3B2 loc_D3B2:                               ; CODE XREF: _main+527↑j
+0D3B2                                         ; _main+531↑j
+0D3B2                 cmp     [esp+4A8h+var_C], 3
+0D3BA                 jnz     short loc_D3F2
+0D3BC                 cmp     [esp+4A8h+var_18], 0
+0D3C4                 jnz     short loc_D3F2
+0D3C6                 cmp     [esp+4A8h+var_68], 1
+0D3CE                 jz      short loc_D3DC
+0D3D0                 mov     [esp+4A8h+var_4A8], offset aCannotSpecifyM ; "cannot specify multiple files with -c"
+0D3D7                 call    sub_5C4C
+0D3DC
+0D3DC loc_D3DC:                               ; CODE XREF: _main+55A↑j
+0D3DC                 cmp     [esp+4A8h+var_1C], 0
+0D3E4                 jz      short loc_D3F2
+0D3E6                 mov     [esp+4A8h+var_4A8], offset aCannotSpecifyL ; "cannot specify libraries with -c"
+0D3ED                 call    sub_5C4C
+0D3F2
+0D3F2 loc_D3F2:                               ; CODE XREF: _main+546↑j
+0D3F2                                         ; _main+550↑j ...
+0D3F2                 cmp     [esp+4A8h+var_C], 0
+0D3FA                 jz      loc_D4A4
+0D400                 cmp     [esp+4A8h+var_40], 0
+0D408                 jnz     loc_D4A4
+0D40E                 cmp     [esp+4A8h+var_C], 3
+0D416                 jnz     short loc_D479
+0D418                 cmp     [esp+4A8h+var_18], 0
+0D420                 jnz     short loc_D479
+0D422                 mov     eax, [esp+4A8h+var_74]
+0D429                 mov     eax, [eax]
+0D42B                 mov     [esp+4A8h+var_4A0], eax
+0D42F                 mov     [esp+4A8h+var_4A4], 3FFh
+0D437                 lea     eax, [esp+4A8h+var_478]
+0D43B                 mov     [esp+4A8h+var_4A8], eax
+0D43E                 call    sub_11690
+0D443                 mov     [esp+4A8h+var_4A4], 2Eh ; '.'
+0D44B                 lea     eax, [esp+4A8h+var_478]
+0D44F                 mov     [esp+4A8h+var_4A8], eax
+0D452                 call    sub_1D8
+0D457                 mov     [esp+4A8h+var_6C], eax
+0D45E                 cmp     [esp+4A8h+var_6C], 0
+0D466                 jz      short loc_D47C
+0D468                 mov     eax, [esp+4A8h+var_6C]
+0D46F                 add     eax, 1
+0D472                 mov     word ptr [eax], 6Fh ; 'o'
+0D477                 jmp     short loc_D499
+0D479
+0D479 loc_D479:                               ; CODE XREF: _main+5A2↑j
+0D479                                         ; _main+5AC↑j
+0D479                 nop
+0D47A                 jmp     short loc_D47D
+0D47C
+0D47C loc_D47C:                               ; CODE XREF: _main+5F2↑j
+0D47C                 nop
+0D47D
+0D47D loc_D47D:                               ; CODE XREF: _main+606↑j
+0D47D                 mov     [esp+4A8h+var_4A0], offset aAOut ; "a.out"
+0D485                 mov     [esp+4A8h+var_4A4], 400h
+0D48D                 lea     eax, [esp+4A8h+var_478]
+0D491                 mov     [esp+4A8h+var_4A8], eax
+0D494                 call    sub_11690
+0D499
+0D499 loc_D499:                               ; CODE XREF: _main+603↑j
+0D499                 lea     eax, [esp+4A8h+var_478]
+0D49D                 mov     [esp+4A8h+var_40], eax
+0D4A4
+0D4A4 loc_D4A4:                               ; CODE XREF: _main+586↑j
+0D4A4                                         ; _main+594↑j
+0D4A4                 mov     eax, ds:dword_2046C
+0D4A9                 test    eax, eax
+0D4AB                 jz      short loc_D4C0
+0D4AD                 call    sub_9F34
+0D4B2                 mov     [esp+4A8h+var_2C], eax
+0D4B9                 mov     [esp+4A8h+var_28], edx
+0D4C0
+0D4C0 loc_D4C0:                               ; CODE XREF: _main+637↑j
+0D4C0                 mov     eax, [esp+4A8h+var_C]
+0D4C7                 mov     [esp+4A8h+var_4A4], eax
+0D4CB                 mov     eax, [esp+4A8h+var_58]
+0D4D2                 mov     [esp+4A8h+var_4A8], eax
+0D4D5                 call    sub_174EC
+0D4DA                 mov     [esp+4A8h+var_14], 0
+0D4E5                 jmp     loc_D584
+0D4EA
+0D4EA loc_D4EA:                               ; CODE XREF: _main+71E↓j
+0D4EA                 mov     edx, [esp+4A8h+var_74]
+0D4F1                 mov     eax, [esp+4A8h+var_14]
+0D4F8                 shl     eax, 2
+0D4FB                 add     eax, edx
+0D4FD                 mov     eax, [eax]
+0D4FF                 mov     [esp+4A8h+var_70], eax
+0D506                 mov     eax, [esp+4A8h+var_70]
+0D50D                 movzx   eax, byte ptr [eax]
+0D510                 cmp     al, 2Dh ; '-'
+0D512                 jnz     short loc_D54E
+0D514                 mov     eax, [esp+4A8h+var_70]
+0D51B                 add     eax, 2
+0D51E                 mov     [esp+4A8h+var_4A4], eax
+0D522                 mov     eax, [esp+4A8h+var_58]
+0D529                 mov     [esp+4A8h+var_4A8], eax
+0D52C                 call    sub_13E30
+0D531                 test    eax, eax
+0D533                 jns     short loc_D57C
+0D535                 mov     eax, [esp+4A8h+var_70]
+0D53C                 mov     [esp+4A8h+var_4A4], eax
+0D540                 mov     [esp+4A8h+var_4A8], offset aCannotFindS ; "cannot find %s"
+0D547                 call    sub_5C4C
+0D54C                 jmp     short loc_D57C
+0D54E
+0D54E loc_D54E:                               ; CODE XREF: _main+69E↑j
+0D54E                 mov     eax, [esp+4A8h+var_70]
+0D555                 mov     [esp+4A8h+var_4A4], eax
+0D559                 mov     eax, [esp+4A8h+var_58]
+0D560                 mov     [esp+4A8h+var_4A8], eax
+0D563                 call    sub_13B0C
+0D568                 test    eax, eax
+0D56A                 jns     short loc_D57C
+0D56C                 mov     [esp+4A8h+var_20], 1
+0D577                 jmp     loc_D717
+0D57C
+0D57C loc_D57C:                               ; CODE XREF: _main+6BF↑j
+0D57C                                         ; _main+6D8↑j ...
+0D57C                 add     [esp+4A8h+var_14], 1
+0D584
+0D584 loc_D584:                               ; CODE XREF: _main+671↑j
+0D584                 mov     eax, [esp+4A8h+var_78]
+0D58B                 cmp     [esp+4A8h+var_14], eax
+0D592                 jl      loc_D4EA
+0D598                 mov     eax, [esp+4A8h+var_74]
+0D59F                 mov     [esp+4A8h+var_4A8], eax
+0D5A2                 call    sub_14970
+0D5A7                 mov     eax, ds:dword_2046C
+0D5AC                 test    eax, eax
+0D5AE                 jz      loc_D6A8
+0D5B4                 call    sub_9F34
+0D5B9                 sub     eax, [esp+4A8h+var_2C]
+0D5C0                 sbb     edx, [esp+4A8h+var_28]
+0D5C7                 mov     dword ptr [esp+4A8h+var_484], eax
+0D5CB                 mov     dword ptr [esp+4A8h+var_484+4], edx
+0D5CF                 fild    [esp+4A8h+var_484]
+0D5D3                 fld     ds:dbl_1CD48
+0D5D9                 fdivp   st(1), st
+0D5DB                 fstp    [esp+4A8h+var_54]
+0D5E2                 fld     [esp+4A8h+var_54]
+0D5E9                 fld     ds:dbl_1CD50
+0D5EF                 fcomip  st, st(1)
+0D5F1                 fstp    st
+0D5F3                 jbe     short loc_D602
+0D5F5                 fld     ds:dbl_1CD50
+0D5FB                 fstp    [esp+4A8h+var_54]
+0D602
+0D602 loc_D602:                               ; CODE XREF: _main+77F↑j
+0D602                 mov     eax, ds:dword_22B00
+0D607                 test    eax, eax
+0D609                 jg      short loc_D615
+0D60B                 mov     ds:dword_22B00, 1
+0D615
+0D615 loc_D615:                               ; CODE XREF: _main+795↑j
+0D615                 mov     eax, ds:dword_22B00
+0D61A                 mov     dword ptr [esp+4A8h+var_484], eax
+0D61E                 fild    dword ptr [esp+4A8h+var_484]
+0D622                 fdiv    [esp+4A8h+var_54]
+0D629                 fld     ds:dbl_1CD48
+0D62F                 fdivp   st(1), st
+0D631                 mov     eax, ds:dword_22B04
+0D636                 mov     dword ptr [esp+4A8h+var_484], eax
+0D63A                 fild    dword ptr [esp+4A8h+var_484]
+0D63E                 fdiv    [esp+4A8h+var_54]
+0D645                 fnstcw  [esp+4A8h+var_47A]
+0D649                 movzx   eax, [esp+4A8h+var_47A]
+0D64E                 or      ah, 0Ch
+0D651                 mov     [esp+4A8h+var_47C], ax
+0D656                 fldcw   [esp+4A8h+var_47C]
+0D65A                 fistp   dword ptr [esp+4A8h+var_484]
+0D65E                 fldcw   [esp+4A8h+var_47A]
+0D662                 mov     ebx, dword ptr [esp+4A8h+var_484]
+0D666                 mov     edx, ds:dword_22B00
+0D66C                 mov     eax, ds:dword_22B04
+0D671                 mov     ecx, ds:dword_22670
+0D677                 sub     ecx, 100h
+0D67D                 fstp    [esp+4A8h+var_48C]
+0D681                 mov     [esp+4A8h+var_490], ebx
+0D685                 fld     [esp+4A8h+var_54]
+0D68C                 fstp    [esp+4A8h+var_498]
+0D690                 mov     [esp+4A8h+var_49C], edx
+0D694                 mov     [esp+4A8h+var_4A0], eax
+0D698                 mov     [esp+4A8h+var_4A4], ecx
+0D69C                 mov     [esp+4A8h+var_4A8], offset aDIdentsDLinesD ; "%d idents, %d lines, %d bytes, %0.3f s,"...
+0D6A3                 call    sub_11624
+0D6A8
+0D6A8 loc_D6A8:                               ; CODE XREF: _main+73A↑j
+0D6A8                 mov     eax, [esp+4A8h+var_58]
+0D6AF                 mov     eax, [eax]
+0D6B1                 test    eax, eax
+0D6B3                 jz      short loc_D6DC
+0D6B5                 mov     eax, [esp+4A8h+var_40]
+0D6BC                 mov     [esp+4A8h+var_4A4], eax
+0D6C0                 mov     eax, [esp+4A8h+var_58]
+0D6C7                 mov     [esp+4A8h+var_4A8], eax
+0D6CA                 call    sub_15E44
+0D6CF                 mov     [esp+4A8h+var_20], 0
+0D6DA                 jmp     short loc_D717
+0D6DC
+0D6DC loc_D6DC:                               ; CODE XREF: _main+83F↑j
+0D6DC                 mov     eax, [esp+4A8h+var_8]
+0D6E3                 lea     edx, ds:0[eax*4]
+0D6EA                 mov     eax, [ebp+argv]
+0D6ED                 add     edx, eax
+0D6EF                 mov     eax, [ebp+argc]
+0D6F2                 sub     eax, [esp+4A8h+var_8]
+0D6F9                 mov     [esp+4A8h+var_4A0], edx
+0D6FD                 mov     [esp+4A8h+var_4A4], eax
+0D701                 mov     eax, [esp+4A8h+var_58]
+0D708                 mov     [esp+4A8h+var_4A8], eax
+0D70B                 call    sub_17490
+0D710                 mov     [esp+4A8h+var_20], eax
+0D717
+0D717 loc_D717:                               ; CODE XREF: _main+703↑j
+0D717                                         ; _main+866↑j
+0D717                 mov     eax, ds:dword_20470
+0D71C                 test    eax, eax
+0D71E                 jnz     short loc_D72F
+0D720                 mov     eax, [esp+4A8h+var_58]
+0D727                 mov     [esp+4A8h+var_4A8], eax
+0D72A                 call    sub_14754
+0D72F
+0D72F loc_D72F:                               ; CODE XREF: _main+8AA↑j
+0D72F                 mov     eax, [esp+4A8h+var_20]
+0D736
+0D736 loc_D736:                               ; CODE XREF: _main+2AF↑j
+0D736                                         ; _main+4D0↑j ...
+0D736                 mov     ebx, [ebp+var_4]
+0D739                 leave
+0D73A                 retn
+0D73A _main           endp
+
