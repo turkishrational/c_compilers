@@ -2,8 +2,7 @@
 
 typedef unsigned int size_t_trdos;
 
-/* GCC compiler maps C symbols to underscore prefix. 
-   To provide "__mingw_free" to the linker, we define "_mingw_free" in C code. */
+/* GCC compiler maps C symbols to underscore prefix. */
 // void _mingw_free(void *ptr) {}
 // void *_mingw_realloc(void *ptr, size_t_trdos size) { return ptr; }
 
@@ -31,7 +30,9 @@ void __stdcall InitializeCriticalSection(void *lpCriticalSection) {}
 void __stdcall EnterCriticalSection(void *lpCriticalSection) {}
 void __stdcall LeaveCriticalSection(void *lpCriticalSection) {}
 
+#if 0 /* <- KOÞULSUZ OLARAK KATI MODDA DEVRE DIÞI BIRAKIYORUZ */
 float strtof(const char *nptr, char **endptr) { return 0.0f; }
 long double strtold(const char *nptr, char **endptr) { return 0.0L; }
+#endif
 double __strtod(const char *nptr, char **endptr) { return 0.0; }
 unsigned long __stdcall GetModuleFileNameA(void* hModule, char* lpFilename, unsigned long nSize) { return 0; }

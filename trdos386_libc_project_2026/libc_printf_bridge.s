@@ -37,6 +37,7 @@
    ========================================================================= */
 
 _printf:
+_trdos_print:		  /* 29/6/2026 */
 __mingw_printf:
     push ebp
     mov ebp, esp
@@ -81,18 +82,6 @@ __mingw_vfprintf:
     push dword ptr [ebp + 16] /* argptr */
     push dword ptr [ebp + 12] /* format */
     push dword ptr [ebp + 8]  /* Stream pointer or FD */
-    call __print
-    add esp, 12
-    pop ebp
-    ret
-
-_trdos_print:
-    push ebp
-    mov ebp, esp
-    lea eax, [ebp + 12]
-    push eax
-    push dword ptr [ebp + 8]
-    push 1
     call __print
     add esp, 12
     pop ebp
