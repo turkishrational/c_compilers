@@ -1199,31 +1199,63 @@ void tcc_set_error_func(TCCState *s, void *error_opaque,
 #endif
 
 /* error without aborting current compilation */
+// void error_noabort(const char *fmt, ...)
+// {
+//    TCCState *s1 = tcc_state;
+//    va_list ap;
+//
+//    va_start(ap, fmt);
+//    error1(s1, 0, fmt, ap);
+//    va_end(ap);
+// }
+
+/* 28/6/2026 - Google AI & Erdogan Tan */
+/* =========================================================================
+   TRDOS SAF Flat ERROR VE TAMPON BYPASS MOTORLARI (0Dh GPF ENGELLEYÝCÝ)
+   ========================================================================= */
 void error_noabort(const char *fmt, ...)
 {
-    TCCState *s1 = tcc_state;
-    va_list ap;
-
-    va_start(ap, fmt);
-    error1(s1, 0, fmt, ap);
-    va_end(ap);
+    /* Fabrice Bellard'ýn tüm stderr ve setjmp döngülerini çöpe atýyoruz! */
+    extern int write(int fd, const void *buf, unsigned int count);
+    
+    write(1, "\r\n-> [TCC ERROR]: A compilation error or missing file detected!\r\n", 67);
+    /* noabort kuralý uyarýnca çöktürmeden, güvenle fonksiyon çaðýran yere geri döndürüyoruz */
+    return;
 }
 
+// void error(const char *fmt, ...)
+// {
+//    TCCState *s1 = tcc_state;
+//    va_list ap;
+//
+//    va_start(ap, fmt);
+//    error1(s1, 0, fmt, ap);
+//    va_end(ap);
+//    /* better than nothing: in some cases, we accept to handle errors */
+//    if (s1->error_set_jmp_enabled) {
+//        longjmp(s1->error_jmp_buf, 1);
+//    } else {
+//        /* XXX: eliminate this someday */
+//        exit(1);
+//    }
+// }
+
+/* 28/6/2026 - Google AI & Erdogan Tan */
 void error(const char *fmt, ...)
 {
-    TCCState *s1 = tcc_state;
-    va_list ap;
-
-    va_start(ap, fmt);
-    error1(s1, 0, fmt, ap);
-    va_end(ap);
-    /* better than nothing: in some cases, we accept to handle errors */
-    if (s1->error_set_jmp_enabled) {
-        longjmp(s1->error_jmp_buf, 1);
-    } else {
-        /* XXX: eliminate this someday */
-        exit(1);
-    }
+    extern int write(int fd, const void *buf, unsigned int count);
+    
+    write(1, "\r\n-> [TCC FATAL ERROR]: Process aborted safely by TRDOS shield!\r\n", 67);
+    
+    /* Emniyetli Tahliye Kalkaný: Programýn çöküp kýrmýzý ekran vermesini önlemek için */
+    /* doðrudan sys_exit (1) kesmesini tetikleyerek pürüzsüzce prompt'a fýrlatýyoruz! */
+    __asm__ __volatile__ (
+        ".intel_syntax noprefix\n"
+        "mov ebx, 1\n"
+        "mov eax, 1\n" /* sys_exit */
+        "int 0x40\n"
+        ".att_syntax\n"
+    );
 }
 
 void expect(const char *msg)
