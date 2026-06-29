@@ -1,39 +1,71 @@
+/* ===========================================================================
+   TRDOS 386 - TEKÝL VE GÜVENLÝ SBRK MOTORU (sbrk.s)
+   =========================================================================== */
 .intel_syntax noprefix
 .global _sbrk
-.extern _end
-.text
+.extern _end       /* Linker'dan gelen BSS bitiþ koordinatý */
 
+.text
 _sbrk:
     push ebp
     mov ebp, esp
+    push ebx
+    push ecx
 
-    /* Load the tracked dynamic memory boundary */
-    mov eax, [current_brk] 
+    mov ecx, [ebp + 8]    /* Ýstenen byte boyutu (size) */
+    
+    /* DWORD Hizalamasý (Her ihtimale karþý sbrk seviyesinde zýrh) */
+    add ecx, 3
+    and ecx, 0xFFFFFFFC
+
+    /* Ýlk çaðrý kontrolü */
+    mov eax, [current_break]
     test eax, eax
-    jnz .L_do_inc             /* If already initialized, jump to increment */
-
-    /* First-time initialization: Set heap start where Linker marked the end (_end) */
-    mov eax, offset _end      /* EAX = Program Size + BSS End Pointer */
-    mov [current_brk], eax    /* Initialize tracker storage */
-
-.L_do_inc:
-    mov edx, [ebp + 8]        /* Fetch argument 1: increment size (bytes) */
+    jnz .L_calc_new
     
-    /* EAX preserves the OLD break address to be returned back to malloc */
-    add edx, eax              /* Calculate raw target address boundary */
-    add edx, 3                /* Align to 32-bit (DWORD) boundary: Round up */
-    ;and edx, 0xFFFFFFFC      /* Clear lower two bits to finalize 4-byte alignment */
-    and dl, 0xFC 	    
+    /* Ýlk çaðrýda taban adresi _end olarak mühürleniyor */
+    mov eax, offset _end
+    add eax, 3
+    and eax, 0xFFFFFFFC
+    mov [current_break], eax
 
-    mov [current_brk], edx    /* Save the newly aligned dynamic memory limit */
+.L_calc_new:
+    mov ebx, [current_break] /* EBX = Eski u.break (Geri dönecek olan geçerli adres) */
+    mov edx, ebx
+    add edx, ecx           /* EDX = Yeni u.break sýnýrý */
+
+    /* TRDOS Kernel sys_break (17) Çaðrýsý */
+    push ebx
+    mov ebx, edx
+    mov eax, 17
+    int 0x40
+    pop ebx
     
-    /* EAX currently contains the unmodified previous break address, which is the return value */
+    /* Hata Kontrolü (Carry Flag veya EAX < 0 kontrolü yapýlabilir) */
+    cmp eax, 0
+    jl .L_err
+
+    /* Baþarýlý ise global göstergeyi güncelle */
+    mov [current_break], edx
+
+    /* Demand Paging & Zero-Fill Zýrhý: Yeni alaný el ile tetikle ve temizle */
+    push edi
+    mov edi, ebx           /* Baþlangýç adresi */
+    shr ecx, 2             /* DWORD sayýsýna böl (ecx / 4) */
+    xor eax, eax           /* Yazýlacak deðer: 0 */
+    rep stosd              /* Tüm yeni alaný sýfýrla ve sayfalarý Ring 3'e baðla */
+    pop edi
+
+    mov eax, ebx           /* Eski break adresini (tahsis edilen yerin baþý) döndür */
+    jmp .L_done
+
+.L_err:
+    xor eax, eax           /* Bellek bittiyse NULL (0) dön */
+
+.L_done:
+    pop ecx
+    pop ebx
     pop ebp
     ret
 
-/* ---------------------------------------------------------------------------- */
-/* Internal Dynamic Storage (Embedded inside text segment via GAS directives)   */
-/* ---------------------------------------------------------------------------- */
-.align 4
-current_brk: 
-    .long 0                   /* Runtime variable holding current heap limit */
+current_break: .long 0  /* Tüm sistemin tekil u.break izleyicisi */
