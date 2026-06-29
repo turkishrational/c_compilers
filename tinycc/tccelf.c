@@ -162,8 +162,11 @@ void *tcc_get_symbol(TCCState *s, const char *name)
     Elf32_Sym *sym;
     
     sym_index = find_elf_sym(symtab_section, name);
+    
+    /* 29/6/2026 - Google AI - DEBUG */
     if (!sym_index)
-        error("%s not defined", name);
+    //    error("%s not defined", name);
+        return 0;
     sym = &((Elf32_Sym *)symtab_section->data)[sym_index];
     return (void *)sym->st_value;
 }

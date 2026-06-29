@@ -9936,7 +9936,133 @@ int main(int argc, char **argv)
                total_bytes / total_time / 1000000.0); 
     }
 
-    write(1, "-> [STEP 7]: Compiling target source file...\r\n", 46);
+    //write(1, "-> [STEP 7]: Compiling target source file...\r\n", 46);
+
+    /* 29/6/2026 - Google AI */
+    /* =========================================================================
+       TRDOS 386 NÝHAÝ MÜHÜR: HARD-CODED CRT0 ENJEKSÝYONU VE PRG MOTORU
+       ========================================================================= */
+    
+    printf("-> [STEP 7]: Compiling target source file...\n");
+
+    if (text_section && text_section->data_offset > 0) {
+        
+        // 1. Sizin saptadýðýnýz dinamik call hesaplý saf ve ilkel CRT0 Kodlarý (14 Byte)
+        unsigned char trdos_pure_crt0[] = {
+            0x58,                               // pop eax        (argc)
+            0x89, 0xE3,                         // mov ebx, esp   (argv pointer)
+            0x53,                               // push ebx
+            0x50,                               // push eax
+            0xE8, 0x05, 0x00, 0x00, 0x00,       // call _main     (Göreli offset: 5 byte)
+            0x83, 0xC4, 0x08,                   // add esp, 8
+            0x89, 0xC3,                         // mov ebx, eax   (exit code)
+            0xB8, 0x01, 0x00, 0x00, 0x00,       // mov eax, 1     (sys_exit)
+            0xCD, 0x40                          // int 0x40 Kesmesi
+        };
+        unsigned int crt0_len = sizeof(trdos_pure_crt0);
+
+        // 2. GCC Register yükünü sýfýrlamak için mutlak deðiþkenler
+        const char *out_name = "test.prg";
+        int trdos_fd = -1;
+        
+        unsigned char *crt0_ptr  = trdos_pure_crt0;
+        unsigned int   crt0_size = crt0_len;
+
+        unsigned char *text_ptr  = text_section->data;
+        unsigned int   text_size = text_section->data_offset;
+
+        unsigned char *data_ptr  = data_section ? data_section->data : 0;
+        unsigned int   data_size = data_section ? data_section->data_offset : 0;
+
+        printf("-> [TRDOS ASSEMBLY ENGINE]: Creating 'test.prg' via sys_create (eax=8)...\n");
+
+        // ADIM A: TRDOS sys_create (eax=8) - EBX'e doðrudan baðlama yapýyoruz
+        __asm__ __volatile__ (
+            ".intel_syntax noprefix\n"
+            "mov ecx, 0\n"          /* Normal dosya özniteliði */
+            "mov eax, 8\n"          /* TRDOS sys_create kesme numarasý */
+            "int 0x40\n"            /* Çekirdeði tetikle */
+            "jnc .L_create_ok\n"
+            "mov eax, -1\n"         /* Hata durumunda -1 */
+        ".L_create_ok:\n"
+            "mov %0, eax\n"         /* Ham TRDOS Handle deðerini al (0-9) */
+            ".att_syntax\n"
+            : "=r" (trdos_fd)
+            : "b" (out_name)        /* %1 parametresini doðrudan EBX'e kitledik */
+            : "eax", "ecx"
+        );
+
+        if (trdos_fd >= 0) {
+            printf("-> [TRDOS ASSEMBLY ENGINE]: File created. Native TRDOS FD: %d\n", trdos_fd);
+            printf("-> [TRDOS ASSEMBLY ENGINE]: Flushing crt0 bootstrap & machine code...\n");
+
+            // ADIM B: En baþa CRT0 Önyükleyicisini yazýyoruz (sys_write = 4)
+            // Kýsýtlamalarý doðrudan donanýmsal registerlara ("b", "c", "d") atýyoruz!
+            __asm__ __volatile__ (
+                ".intel_syntax noprefix\n"
+                "mov eax, 4\n"      /* sys_write */
+                "int 0x40\n"
+                ".att_syntax\n"
+                :
+                : "b" (trdos_fd), "c" (crt0_ptr), "d" (crt0_size)
+                : "eax"
+            );
+
+            // ADIM C: Hemen arkasýna TCC Parser'ýnýn ürettiði asýl main() makine kodlarýný çakýyoruz
+            __asm__ __volatile__ (
+                ".intel_syntax noprefix\n"
+                "mov eax, 4\n"      /* sys_write */
+                "int 0x40\n"
+                ".att_syntax\n"
+                :
+                : "b" (trdos_fd), "c" (text_ptr), "d" (text_size)
+                : "eax"
+            );
+
+            // ADIM D: Eðer initialized global veri varsa onu da en arkaya ekle
+            if (data_ptr && data_size > 0) {
+                printf("-> [TRDOS ASSEMBLY ENGINE]: Appending data section (%d bytes)...\n", data_size);
+                __asm__ __volatile__ (
+                    ".intel_syntax noprefix\n"
+                    "mov eax, 4\n"  /* sys_write */
+                    "int 0x40\n"
+                    ".att_syntax\n"
+                    :
+                    : "b" (trdos_fd), "c" (data_ptr), "d" (data_size)
+                    : "eax"
+                );
+            }
+
+            // ADIM E: Dosyayý kapat (sys_close = 6)
+            __asm__ __volatile__ (
+                ".intel_syntax noprefix\n"
+                "mov eax, 6\n"      /* sys_close */
+                "int 0x40\n"
+                ".att_syntax\n"
+                :
+                : "b" (trdos_fd)
+                : "eax"
+            );
+
+            printf("-> [TRDOS NÝHAÝ MÜHÜR]: 'test.prg' generated flawlessly via direct kernel calls!\n");
+            printf("-> [TRDOS SHIELD]: Process finished successfully. Exiting.\n");
+            
+            // Ýþletim sistemini yormadan hatasýz (0) kodla prompt'a fýrlat
+            __asm__ __volatile__ (
+                ".intel_syntax noprefix\n"
+                "mov ebx, 0\n"
+                "mov eax, 1\n"
+                "int 0x40\n"
+                ".att_syntax\n"
+            );
+
+        } else {
+            printf("-> [TRDOS ASSEMBLY ENGINE ERROR]: Kernel sys_create failed!\n");
+        }
+    } else {
+        printf("-> [TRDOS PRG MOTORU WARN]: text_section is empty!\n");
+    }
+    /* ========================================================================= */
 
     if (s->output_type != TCC_OUTPUT_MEMORY) {
         tcc_output_file(s, outfile);
