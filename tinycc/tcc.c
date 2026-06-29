@@ -8700,18 +8700,10 @@ static int tcc_compile(TCCState *s1)
        ========================================================================= */
     /* sym_pop(&global_stack, NULL) döngüsünün RAM'i dondurmasýný engellemek için */
     /* derleme bittiði an makine kodunu koruyarak doðrudan sys_exit ile fýrlýyoruz! */
-    write(1, "-> [TRDOS NÝHAÝ ZIRH]: 0.9.18 compilation completed successfully!\r\n", 74);
+    write(1, "-> [TRDOS NiHAi ZIRH]: 0.9.18 compilation completed successfully!\r\n", 74);
 
-    __asm__ __volatile__ (
-        ".intel_syntax noprefix\n"
-        "mov ebx, 0\n"        /* Hatasýz tahliye kodu (0) */
-        "mov eax, 1\n"        /* sys_exit kesme numarasý (1) */
-        "int 0x40\n"          /* TRDOS Çekirdeðini tetikle ve prompt'a fýrlat! */
-        ".att_syntax\n"
-    );
-
-    /* Bu satýrlara asla ulaþýlamayacak, böylece kilitlenmeler tamamen kurutuldu */
-    sym_pop(&global_stack, NULL);
+    /* 29/6/2026 */
+    ;sym_pop(&global_stack, NULL);
     return s1->nb_errors != 0 ? -1 : 0;
 }
 
