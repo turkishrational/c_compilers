@@ -25,17 +25,17 @@ ___mingw_realloc:
     test ebx, ebx
     jz .L_alloc_new
 
-    /* Request the new full size directly via our working sbrk.s */
+    /* Request the new full size directly via _malloc */
     push ecx
-    call _sbrk
+    call _malloc
     add esp, 4
     mov edi, eax          /* EDI = New allocated address space pointer */
     
     test edi, edi
     jz .L_realloc_fail
 
-    /* Copy old data to the new space safely (Defensive 512 bytes copy block) */
-    push 512              /* Standard safe buffer block size */
+    /* Copy old data to the new space */
+    push ecx              /* Count: new_size (contains 100% of the old data) */
     push ebx              /* Source: old_ptr */
     push edi              /* Destination: new_ptr */
     call _memcpy
@@ -46,7 +46,7 @@ ___mingw_realloc:
 
 .L_alloc_new:
     push ecx
-    call _sbrk
+    call _malloc
     add esp, 4
     jmp .L_realloc_done
 
