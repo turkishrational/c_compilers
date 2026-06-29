@@ -1232,17 +1232,15 @@ void tcc_set_error_func(TCCState *s, void *error_opaque,
 //    va_end(ap);
 // }
 
-/* 28/6/2026 - Google AI & Erdogan Tan */
-/* =========================================================================
-   TRDOS SAF Flat ERROR VE TAMPON BYPASS MOTORLARI (0Dh GPF ENGELLEYÝCÝ)
-   ========================================================================= */
+/* 29/6/2026 - Google AI & Erdogan Tan */
 void error_noabort(const char *fmt, ...)
 {
-    /* Fabrice Bellard'ýn tüm stderr ve setjmp döngülerini çöpe atýyoruz! */
-    extern int write(int fd, const void *buf, unsigned int count);
-    
-    write(1, "\r\n-> [TCC ERROR]: A compilation error or missing file detected!\r\n", 67);
-    /* noabort kuralý uyarýnca çöktürmeden, güvenle fonksiyon çaðýran yere geri döndürüyoruz */
+    // printf fonksiyonunun dýþarýdan çözülmesi için (eðer header eklenmediyse)
+    extern int printf(const char *format, ...);
+    printf("\n-> [TCC WARNING/ERROR]: ");
+    printf(fmt, ((void**)&fmt)[1], ((void**)&fmt)[2], ((void**)&fmt)[3]);
+    printf("\n");
+    /* Süreci sonlandýrmadan çaðýran parser döngüsüne geri iade et */
     return;
 }
 
@@ -1263,19 +1261,20 @@ void error_noabort(const char *fmt, ...)
 //    }
 // }
 
-/* 28/6/2026 - Google AI & Erdogan Tan */
+/* 29/6/2026 - Google AI & Erdogan Tan */
 void error(const char *fmt, ...)
 {
-    extern int write(int fd, const void *buf, unsigned int count);
-    
-    write(1, "\r\n-> [TCC FATAL ERROR]: Process aborted safely by TRDOS shield!\r\n", 67);
-    
-    /* Emniyetli Tahliye Kalkaný: Programýn çöküp kýrmýzý ekran vermesini önlemek için */
-    /* doðrudan sys_exit (1) kesmesini tetikleyerek pürüzsüzce prompt'a fýrlatýyoruz! */
+    extern int printf(const char *format, ...);
+    printf("\n-> [TCC FATAL ERROR]: ");
+    printf(fmt, ((void**)&fmt)[1], ((void**)&fmt)[2], ((void**)&fmt)[3]);
+
+    printf("\n-> [TRDOS SHIELD]: Terminating via sys_exit(1).\n");
+
+    /* Ölümcül hata durumunda TRDOS'u korumak için sys_exit (eax=1) fýrlatmasý */
     __asm__ __volatile__ (
         ".intel_syntax noprefix\n"
         "mov ebx, 1\n"
-        "mov eax, 1\n" /* sys_exit */
+        "mov eax, 1\n" 
         "int 0x40\n"
         ".att_syntax\n"
     );
