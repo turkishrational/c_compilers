@@ -8700,7 +8700,7 @@ static int tcc_compile(TCCState *s1)
        ========================================================================= */
     /* sym_pop(&global_stack, NULL) döngüsünün RAM'i dondurmasýný engellemek için */
     /* derleme bittiði an makine kodunu koruyarak doðrudan sys_exit ile fýrlýyoruz! */
-    write(1, "-> [TRDOS NiHAi ZIRH]: 0.9.18 compilation completed successfully!\r\n", 74);
+    write(1, "-> [TRDOS NiHAi ZIRH]: 0.9.18 compilation completed successfully!\r\n", 67);
 
     /* 29/6/2026 */
     ;sym_pop(&global_stack, NULL);
@@ -9420,7 +9420,7 @@ int tcc_set_output_type(TCCState *s, int output_type)
     char buf[1024];
     extern int write(int fd, const void *buf, unsigned int count);
 
-    write(1, "   [SUB_LOG 1]: Inside tcc_set_output_type(), configuring state...\r\n", 67);
+    write(1, "   [SUB_LOG 1]: Inside tcc_set_output_type(), configuring state...\r\n", 68);
     s->output_type = output_type;
 
     if (!s->nostdinc) {
