@@ -1,0 +1,271 @@
+     1                                  ; ****************************************************************************
+     2                                  ; tccexec.s - TRDOS 386 - TCC FLAT PRG EXECUTION & EXIT CODE MONITOR
+     3                                  ; ----------------------------------------------------------------------------
+     4                                  ; Erdoğan Tan & Google AI - 04/07/2026
+     5                                  ; ****************************************************************************
+     6                                  
+     7                                  ; TRDOS 386 Sistem Çağrı Sabitleri
+     8                                  _exit 	equ 1
+     9                                  _fork 	equ 2
+    10                                  _wait 	equ 7
+    11                                  _exec	equ 11
+    12                                  _msg    equ 35
+    13                                  _stdio  equ 46
+    14                                  
+    15                                  %macro sys 1-4
+    16                                      %if %0 >= 2   
+    17                                          mov ebx, %2
+    18                                          %if %0 >= 3    
+    19                                              mov ecx, %3
+    20                                              %if %0 = 4
+    21                                                 mov edx, %4   
+    22                                              %endif
+    23                                          %endif
+    24                                      %endif
+    25                                      mov eax, %1
+    26                                      int 40h 
+    27                                  %endmacro
+    28                                  
+    29                                  [BITS 32] 
+    30                                  [ORG 0] 
+    31                                  
+    32                                  START_CODE:
+    33                                  	; Başlangıç başlığını bas (Kırmızı Renk - 0Ch)
+    34 00000000 C605[2C010000]0C        	mov	byte [color], 0Ch
+    35 00000007 BE[49010000]            	mov 	esi, tcc_monitor_hdr
+    36 0000000C E8EE000000              	call 	print_msg
+    37                                  
+    38                                  	; Süreci çatalla (Fork)
+    39 00000011 BB[BB000000]            	mov 	ebx, child_launcher
+    40                                  	sys 	_fork
+    16                              <1>  %if %0 >= 2
+    17                              <1>  mov ebx, %2
+    18                              <1>  %if %0 >= 3
+    19                              <1>  mov ecx, %3
+    20                              <1>  %if %0 = 4
+    21                              <1>  mov edx, %4
+    22                              <1>  %endif
+    23                              <1>  %endif
+    24                              <1>  %endif
+    25 00000016 B802000000          <1>  mov eax, %1
+    26 0000001B CD40                <1>  int 40h
+    41 0000001D 721A                    	jc 	short execution_error
+    42                                  
+    43 0000001F A3[30010000]            	mov	[cpid], eax 	; Alt sürecin ID'sini sakla
+    44                                  
+    45                                  	; Parent bekleme döngüsüne giriyor
+    46 00000024 C605[2C010000]07        	mov	byte [color], 07h
+    47                                  parent_wait:
+    48 0000002B BBE7030000              	mov	ebx, 999 	; Bloklanan wait çağrısı
+    49                                  	sys 	_wait
+    16                              <1>  %if %0 >= 2
+    17                              <1>  mov ebx, %2
+    18                              <1>  %if %0 >= 3
+    19                              <1>  mov ecx, %3
+    20                              <1>  %if %0 = 4
+    21                              <1>  mov edx, %4
+    22                              <1>  %endif
+    23                              <1>  %endif
+    24                              <1>  %endif
+    25 00000030 B807000000          <1>  mov eax, %1
+    26 00000035 CD40                <1>  int 40h
+    50 00000037 7311                    	jnc	short wait_success
+    51                                  
+    52                                  execution_error:
+    53 00000039 BE[D7010000]            	mov 	esi, msg_err
+    54 0000003E E8BC000000              	call 	print_msg
+    55                                  	sys	_exit
+    16                              <1>  %if %0 >= 2
+    17                              <1>  mov ebx, %2
+    18                              <1>  %if %0 >= 3
+    19                              <1>  mov ecx, %3
+    20                              <1>  %if %0 = 4
+    21                              <1>  mov edx, %4
+    22                              <1>  %endif
+    23                              <1>  %endif
+    24                              <1>  %endif
+    25 00000043 B801000000          <1>  mov eax, %1
+    26 00000048 CD40                <1>  int 40h
+    56                                  
+    57                                  wait_success:
+    58 0000004A 3B05[30010000]          	cmp 	eax, [cpid]	; Doğru child mı kontrol et
+    59 00000050 75D9                    	jne 	short parent_wait	
+    60                                  
+    61                                  	; EAX = Alt sürecin ID'si
+    62                                  	; EBX = Alt sürecin dönüş kodu (Exit Code) -> TCC'nin ürettiği 'c' değeri!
+    63 00000052 53                      	push	ebx  		; Çıkış kodunu yığına at
+    64                                  
+    65                                  	; Başarı mesajlarını ve dosya adını yazdır (Yeşil/Sarı)
+    66 00000053 C605[2C010000]0A        	mov	byte [color], 0Ah
+    67 0000005A BE[7B010000]            	mov	esi, child_label
+    68 0000005F E89B000000              	call	print_msg
+    69 00000064 C605[2C010000]0E        	mov	byte [color], 0Eh
+    70 0000006B BE[34010000]            	mov	esi, prgfilename
+    71 00000070 E88A000000              	call	print_msg	
+    72                                  
+    73 00000075 C605[2C010000]07        	mov	byte [color], 07h
+    74 0000007C BE[10020000]            	mov	esi, CRLF
+    75 00000081 E879000000              	call	print_msg
+    76                                  
+    77                                  	; Yığından exit code değerini al ve ekrana basmak için ASCII'ye çevir
+    78 00000086 58                      	pop	eax
+    79 00000087 E888000000              	call 	bin_to_decimal_str
+    80 0000008C 891D[D0010000]          	mov 	[exitcode], ebx
+    81                                  
+    82 00000092 C605[2C010000]0F        	mov	byte [color], 0Fh 	; Parlak Beyaz
+    83 00000099 BE[A7010000]            	mov 	esi, child_exitcode_msg
+    84 0000009E E85C000000              	call 	print_msg
+    85                                  
+    86                                  monitor_ok:
+    87 000000A3 C605[2C010000]0A        	mov	byte [color], 0Ah
+    88 000000AA BE[EC010000]            	mov 	esi, msg_ok
+    89 000000AF E84B000000              	call 	print_msg
+    90                                  
+    91                                  	sys	_exit
+    16                              <1>  %if %0 >= 2
+    17                              <1>  mov ebx, %2
+    18                              <1>  %if %0 >= 3
+    19                              <1>  mov ecx, %3
+    20                              <1>  %if %0 = 4
+    21                              <1>  mov edx, %4
+    22                              <1>  %endif
+    23                              <1>  %endif
+    24                              <1>  %endif
+    25 000000B4 B801000000          <1>  mov eax, %1
+    26 000000B9 CD40                <1>  int 40h
+    92                                  
+    93                                  ; ============================================================================
+    94                                  ; CHILD LAUNCHER - ALT SÜREÇ TETİKLEYİCİSİ
+    95                                  ; ============================================================================
+    96                                  child_launcher:
+    97                                  	; TCC tarafından üretilen gerçek 'TEST.PRG' dosyasını EXEC et!
+    98                                  	sys	_exec, prgfilename, prgp
+    16                              <1>  %if %0 >= 2
+    17 000000BB BB[34010000]        <1>  mov ebx, %2
+    18                              <1>  %if %0 >= 3
+    19 000000C0 B9[3D010000]        <1>  mov ecx, %3
+    20                              <1>  %if %0 = 4
+    21                              <1>  mov edx, %4
+    22                              <1>  %endif
+    23                              <1>  %endif
+    24                              <1>  %endif
+    25 000000C5 B80B000000          <1>  mov eax, %1
+    26 000000CA CD40                <1>  int 40h
+    99 000000CC 7328                    	jnc	short child_exit_direct
+   100                                  
+   101                                  	; Eğer dosya bulunamadıysa hata bas
+   102 000000CE 3C02                    	cmp	al, 2 
+   103 000000D0 0F8563FFFFFF            	jne	execution_error
+   104                                  
+   105 000000D6 C605[2C010000]0C        	mov	byte [color], 0Ch
+   106 000000DD BE[34010000]            	mov	esi, prgfilename
+   107 000000E2 E818000000              	call	print_msg
+   108 000000E7 BE[90010000]            	mov	esi, not_found
+   109 000000EC E80E000000              	call	print_msg
+   110                                  
+   111                                  child_fail_exit:
+   112 000000F1 B8FF000000              	mov	eax, 0xFF		; Hata durumunda 255 döndür
+   113                                  child_exit_direct:
+   114 000000F6 89C3                    	mov	ebx, eax
+   115                                  	sys 	_exit
+    16                              <1>  %if %0 >= 2
+    17                              <1>  mov ebx, %2
+    18                              <1>  %if %0 >= 3
+    19                              <1>  mov ecx, %3
+    20                              <1>  %if %0 = 4
+    21                              <1>  mov edx, %4
+    22                              <1>  %endif
+    23                              <1>  %endif
+    24                              <1>  %endif
+    25 000000F8 B801000000          <1>  mov eax, %1
+    26 000000FD CD40                <1>  int 40h
+   116                                  
+   117                                  ; ============================================================================
+   118                                  ; YARDIMCI FONKSİYONLAR
+   119                                  ; ============================================================================
+   120                                  print_msg:
+   121                                  	sys 	_msg, esi, 255, [color]
+    16                              <1>  %if %0 >= 2
+    17 000000FF 89F3                <1>  mov ebx, %2
+    18                              <1>  %if %0 >= 3
+    19 00000101 B9FF000000          <1>  mov ecx, %3
+    20                              <1>  %if %0 = 4
+    21 00000106 8B15[2C010000]      <1>  mov edx, %4
+    22                              <1>  %endif
+    23                              <1>  %endif
+    24                              <1>  %endif
+    25 0000010C B823000000          <1>  mov eax, %1
+    26 00000111 CD40                <1>  int 40h
+   122 00000113 C3                      	retn
+   123                                  
+   124                                  bin_to_decimal_str:
+   125 00000114 B90A000000              	mov	ecx, 10
+   126 00000119 31DB                    	xor	ebx, ebx
+   127                                  btd_loop:
+   128 0000011B 31D2                    	xor	edx, edx
+   129 0000011D F7F1                      	div	ecx
+   130 0000011F C1E308                  	shl	ebx, 8
+   131 00000122 80C230                  	add	dl, '0'
+   132 00000125 88D3                    	mov	bl, dl
+   133 00000127 09C0                    	or	eax, eax
+   134 00000129 75F0                    	jnz	short btd_loop
+   135 0000012B C3                      	retn
+   136                                  
+   137                                  ; ============================================================================
+   138                                  ; VERİ VE TANIMLAMALAR BÖLGESİ
+   139                                  ; ============================================================================
+   140 0000012C 00000000                color:		dd 0
+   141 00000130 00000000                cpid:		dd 0
+   142                                  
+   143                                  ; Çalıştırılacak hedef TCC flat binary dosyası
+   144 00000134 544553542E50524700      prgfilename:	db "TEST.PRG", 0
+   145                                  
+   146 0000013D [34010000]              prgp:		dd prgfilename
+   147 00000141 00000000                		dd 0
+   148 00000145 00000000                		dd 0
+   149                                  
+   150                                  ; İletiler
+   151                                  tcc_monitor_hdr:
+   152 00000149 0D0A                    	db 0Dh, 0Ah
+   153 0000014B 5452444F5320333836-     	db 'TRDOS 386 v2 - TCC Flat PRG Exit Code Monitor'
+   153 00000154 207632202D20544343-
+   153 0000015D 20466C617420505247-
+   153 00000166 204578697420436F64-
+   153 0000016F 65204D6F6E69746F72 
+   154 00000178 0D0A00                  	db 0Dh, 0Ah, 0
+   155                                  
+   156                                  child_label:
+   157 0000017B 0D0A                    	db 0Dh, 0Ah
+   158 0000017D 457865637574656420-     	db "Executed Program: ", 0
+   158 00000186 50726F6772616D3A20-
+   158 0000018F 00                 
+   159                                  
+   160                                  not_found:
+   161 00000190 206E6F7420666F756E-     	db " not found on disk! ", 0Dh, 0Ah, 0
+   161 00000199 64206F6E206469736B-
+   161 000001A2 21200D0A00         
+   162                                  
+   163                                  child_exitcode_msg:
+   164 000001A7 3E3E3E20544343204D-     	db '>>> TCC MAIN() RETURN VALUE (EXIT CODE): '
+   164 000001B0 41494E282920524554-
+   164 000001B9 55524E2056414C5545-
+   164 000001C2 20284558495420434F-
+   164 000001CB 4445293A20         
+   165                                  exitcode:
+   166 000001D0 30303030                	dd 30303030h  ; ASCII yerleşim alanı
+   167 000001D4 0D0A00                  	db 0Dh, 0Ah, 0
+   168                                  
+   169                                  msg_err:
+   170 000001D7 0D0A                    	db 0Dh, 0Ah 
+   171 000001D9 457865637574696F6E-     	db 'Execution Error!'
+   171 000001E2 204572726F7221     
+   172 000001E9 0D0A00                  	db 0Dh, 0Ah, 0
+   173                                  
+   174                                  msg_ok:
+   175 000001EC 0D0A                    	db 0Dh, 0Ah
+   176 000001EE 4D6F6E69746F722046-     	db 'Monitor Finished Successfully. ', 0Dh, 0Ah, 0
+   176 000001F7 696E69736865642053-
+   176 00000200 75636365737366756C-
+   176 00000209 6C792E200D0A00     
+   177                                  CRLF:
+   178 00000210 0D0A00                  	db 0Dh, 0Ah, 0
