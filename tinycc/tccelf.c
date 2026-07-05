@@ -776,98 +776,28 @@ static void put_dt(Section *dynamic, int dt, unsigned long val)
     dyn->d_un.d_val = val;
 }
 
+/* 4/7/2026 - Google AI - Test */
+/* 04/07/2026 - TRDOS 386 NATIVE PATH ALIGNMENT */
 /* add tcc runtime libraries */
 static void tcc_add_runtime(TCCState *s1)
 {
-   /* 28/6/2026 - Google AI */
-   return;
-
    char buf[1024];
-   int i;
-   Section *s;
+   extern int write(int fd, const void *buf, unsigned int count);
 
-   snprintf(buf, sizeof(buf), "%s/%s", tcc_lib_path, "libtcc1.o");
-   tcc_add_file(s1, buf);
-#ifdef CONFIG_TCC_BCHECK
-    if (do_bounds_check) {
-        unsigned long *ptr;
-        Section *init_section;
-        unsigned char *pinit;
-        int sym_index;
+   write(1, "      [RUNTIME LOG]: Injecting new TRDOS crt0.o from D:/TCC/LIB...\r\n", 68);
 
-        /* XXX: add an object file to do that */
-        ptr = section_ptr_add(bounds_section, sizeof(unsigned long));
-        *ptr = 0;
-        add_elf_sym(symtab_section, 0, 0, 
-                    ELF32_ST_INFO(STB_GLOBAL, STT_NOTYPE),
-                    bounds_section->sh_num, "__bounds_start");
-        /* add bound check code */
-        snprintf(buf, sizeof(buf), "%s/%s", tcc_lib_path, "bcheck.o");
-        tcc_add_file(s1, buf);
-#ifdef TCC_TARGET_I386
-        if (s1->output_type != TCC_OUTPUT_MEMORY) {
-            /* add 'call __bound_init()' in .init section */
-            init_section = find_section(s1, ".init");
-            pinit = section_ptr_add(init_section, 5);
-            pinit[0] = 0xe8;
-            put32(pinit + 1, -4);
-            sym_index = find_elf_sym(symtab_section, "__bound_init");
-            put_elf_reloc(symtab_section, init_section, 
-                          init_section->data_offset - 4, R_386_PC32, sym_index);
-        }
-#endif
-    }
-#endif
-    /* add libc if not memory output */
-    if (s1->output_type != TCC_OUTPUT_MEMORY) {
-        tcc_add_library(s1, "c");
-        tcc_add_file(s1, CONFIG_TCC_CRT_PREFIX "/crtn.o");
-    }
-    /* add various standard linker symbols */
-    add_elf_sym(symtab_section, 
-                text_section->data_offset, 0,
-                ELF32_ST_INFO(STB_GLOBAL, STT_NOTYPE),
-                text_section->sh_num, "_etext");
-    add_elf_sym(symtab_section, 
-                data_section->data_offset, 0,
-                ELF32_ST_INFO(STB_GLOBAL, STT_NOTYPE),
-                data_section->sh_num, "_edata");
-    add_elf_sym(symtab_section, 
-                bss_section->data_offset, 0,
-                ELF32_ST_INFO(STB_GLOBAL, STT_NOTYPE),
-                bss_section->sh_num, "_end");
-    /* add start and stop symbols for sections whose name can be
-       expressed in C */
-    for(i = 1; i < s1->nb_sections; i++) {
-        s = s1->sections[i];
-        if (s->sh_type == SHT_PROGBITS &&
-            (s->sh_flags & SHF_ALLOC)) {
-            const char *p;
-            int ch;
+   /* Doğrudan LIB altındaki yeni crt0.o dosyasını hedefliyoruz */
+   snprintf(buf, sizeof(buf), "d:/tcc/lib/%s", "crt0.o");
+   
+   /* TCC Linker hattına dahil et */
+//   int r_check = tcc_add_file(s1, buf);
+int r_check = tcc_add_file(s1, "d:/tcc/lib/crt0.o");
 
-            /* check if section name can be expressed in C */
-            p = s->name;
-            for(;;) {
-                ch = *p;
-                if (!ch)
-                    break;
-                if (!isid(ch) && !isnum(ch))
-                    goto next_sec;
-                p++;
-            }
-            snprintf(buf, sizeof(buf), "__start_%s", s->name);
-            add_elf_sym(symtab_section, 
-                        0, 0,
-                        ELF32_ST_INFO(STB_GLOBAL, STT_NOTYPE),
-                        s->sh_num, buf);
-            snprintf(buf, sizeof(buf), "__stop_%s", s->name);
-            add_elf_sym(symtab_section,
-                        s->data_offset, 0,
-                        ELF32_ST_INFO(STB_GLOBAL, STT_NOTYPE),
-                        s->sh_num, buf);
-        }
-    next_sec: ;
-    }
+   if (r_check < 0) {
+       write(1, "\r\n   [LINKER CRITICAL HINT]: Failed to load crt0.o from disk!\r\n", 64);
+   } else {
+       write(1, "\r\n   [LINKER SUCCESS]: crt0.o loaded into linker table successfully!\r\n", 71);
+   }
 }
 
 /* name of ELF interpreter */

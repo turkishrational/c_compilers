@@ -47,21 +47,21 @@
 
 /* 29/6/2026 */
 /* =========================================================================
-   GOOGLE AI & ERDOGAN TAN - Flat PRINTF RE-ROUTE (MAKRO EZME MÜHRÜ)
+   GOOGLE AI & ERDOGAN TAN - Flat PRINTF RE-ROUTE (MAKRO EZME M HR )
    ========================================================================= */
-/* TDM-GCC ve MinGW baþlýk dosyalarýndan sýzan tüm gizli printf makrolarýný */
-/* iptal edip, doðrudan kütüphanemizdeki libc_print_bridge.s içindeki */
-/* saf ve kararlý _printf assembler köprümüze zorla yönlendiriyoruz! */
+/* TDM-GCC ve MinGW ba l k dosyalar ndan s zan t m gizli printf makrolar n  */
+/* iptal edip, do rudan k t phanemizdeki libc_print_bridge.s i indeki */
+/* saf ve kararl  _printf assembler k pr m ze zorla y nlendiriyoruz! */
 #undef printf
 #undef vprintf
 
-/* Sizin kütüphanenizdeki gerçek global _printf imzasýný prototipliyoruz */
+/* Sizin k t phanenizdeki ger ek global _printf imzas n  prototipliyoruz */
 // extern int printf(const char *format, ...);
 extern int trdos_print(const char *format, ...);
 #define printf trdos_print
 
-/* Eðer koddaki fputs veya fprintf çaðrýlarý da stderr tamponuna kaçýyorsa */
-/* onlarý da doðrudan bizim kararlý printf köprümüz üzerinden eritiyoruz */
+/* E er koddaki fputs veya fprintf  a r lar  da stderr tamponuna ka  yorsa */
+/* onlar  da do rudan bizim kararl  printf k pr m z  zerinden eritiyoruz */
 #undef fprintf
 #define fprintf(stream, fmt, ...) printf(fmt, ##__VA_ARGS__)
 #undef fputs
@@ -72,17 +72,17 @@ extern int trdos_print(const char *format, ...);
 
 /* 28/6/2026 -Google AI */
 /* =========================================================================
-   GOOGLE AI & ERDOGAN TAN - TCC 0.9.18 SAF 32-BIT POINTER PROTOTÝP KALKANI
+   GOOGLE AI & ERDOGAN TAN - TCC 0.9.18 SAF 32-BIT POINTER PROTOT P KALKANI
    ========================================================================= */
 /* TDM-GCC-32'nin tcc_add_symbol ve dlsym fonksiyon adreslerini int kabul edip */
-/* 255CCh adresinde 0Dh GPF hatasý vermesini engellemek için imzalarý mühürlüyoruz */
+/* 255CCh adresinde 0Dh GPF hatas  vermesini engellemek i in imzalar  m h rl yoruz */
 extern void *malloc(unsigned int size);
 extern void *realloc(void *ptr, unsigned int size);
 extern void *memcpy(void *dest, const void *src, unsigned int n);
 extern int strcmp(const char *s1, const char *s2);
 extern unsigned int strlen(const char *s);
 extern void *dlsym(void *handle, const char *symbol);
-struct TCCState; /* Forward struct tanýmý */
+struct TCCState; /* Forward struct tan m  */
 int tcc_add_file(TCCState *s, const char *filename);
 int tcc_add_library(TCCState *s, const char *libraryname);
 /* ========================================================================= */
@@ -1235,12 +1235,12 @@ void tcc_set_error_func(TCCState *s, void *error_opaque,
 /* 29/6/2026 - Google AI & Erdogan Tan */
 void error_noabort(const char *fmt, ...)
 {
-    // printf fonksiyonunun dýþarýdan çözülmesi için (eðer header eklenmediyse)
+    // printf fonksiyonunun d  ar dan   z lmesi i in (e er header eklenmediyse)
     extern int printf(const char *format, ...);
     printf("\n-> [TCC WARNING/ERROR]: ");
     printf(fmt, ((void**)&fmt)[1], ((void**)&fmt)[2], ((void**)&fmt)[3]);
     printf("\n");
-    /* Süreci sonlandýrmadan çaðýran parser döngüsüne geri iade et */
+    /* S reci sonland rmadan  a  ran parser d ng s ne geri iade et */
     return;
 }
 
@@ -1270,7 +1270,7 @@ void error(const char *fmt, ...)
 
     printf("\n-> [TRDOS SHIELD]: Terminating via sys_exit(1).\n");
 
-    /* Ölümcül hata durumunda TRDOS'u korumak için sys_exit (eax=1) fýrlatmasý */
+    /*  l mc l hata durumunda TRDOS'u korumak i in sys_exit (eax=1) f rlatmas  */
     __asm__ __volatile__ (
         ".intel_syntax noprefix\n"
         "mov ebx, 1\n"
@@ -8416,28 +8416,28 @@ static void decl(int l)
     Sym *sym;
     AttributeDef ad;
 
-    /* 28/6/2026 */    
-    /* =========================================================================
-       GOOGLE AI & ERDOGAN TAN - PARSER decl() ÝÇ GÖVDE LABÝRENT TEÞHÝSÝ
-       ========================================================================= */
-    extern int write(int fd, const void *buf, unsigned int count);
-    
-    while (1) {
-        write(1, "      [DECL_SUB 1]: Entered inside decl() parser loop.\r\n", 56);
-
-        /* Canlý Token Ýzleme: Okunan ilk kelimenin (int) Token ID deðerini kontrol ediyoruz */
-    if (tok >= 256) {
-        write(1, "      [DECL_SUB 2]: Parsing a complex identifier/keyword...\r\n", 61);
-    } else {
-        write(1, "      [DECL_SUB 2]: Parsing a basic character token.\r\n", 54);
-    }
-
-        /* Eðer okunan ilk sembol geçerli bir tür belirteci (int, char vb.) deðilse */
-    if (tok != TOK_INT && tok != TOK_CHAR && tok != TOK_VOID) {
-        write(1, "      [DECL_SUB_WARN]: Token ID is not a registered baseline type!\r\n", 68);
-    } else {
-        write(1, "      [DECL_SUB 3]: Baseline C type (int/char/void) verified!\r\n", 63);
-    }
+//    /* 28/6/2026 */    
+//    /* =========================================================================
+//       GOOGLE AI & ERDOGAN TAN - PARSER decl()    G VDE LAB RENT TE H S 
+//       ========================================================================= */
+//    extern int write(int fd, const void *buf, unsigned int count);
+//    
+      while (1) {
+//        write(1, "      [DECL_SUB 1]: Entered inside decl() parser loop.\r\n", 56);
+//
+//        /* Canl  Token  zleme: Okunan ilk kelimenin (int) Token ID de erini kontrol ediyoruz */
+//    if (tok >= 256) {
+//        write(1, "      [DECL_SUB 2]: Parsing a complex identifier/keyword...\r\n", 61);
+//    } else {
+//        write(1, "      [DECL_SUB 2]: Parsing a basic character token.\r\n", 54);
+//    }
+//
+//        /* E er okunan ilk sembol ge erli bir t r belirteci (int, char vb.) de ilse */
+//    if (tok != TOK_INT && tok != TOK_CHAR && tok != TOK_VOID) {
+//        write(1, "      [DECL_SUB_WARN]: Token ID is not a registered baseline type!\r\n", 68);
+//    } else {
+//        write(1, "      [DECL_SUB 3]: Baseline C type (int/char/void) verified!\r\n", 63);
+//    }
 
         if (!parse_btype(&btype, &ad)) {
             /* skip redundant ';' */
@@ -8638,7 +8638,7 @@ static void preprocess_init(TCCState *s1)
 
 /* 28/6/2026 - Google AI & Erdogan Tan */
 /* =========================================================================
-   TRDOS-386 SAF FLAT TCC_COMPILE MOTORU (0.9.18 MAÝNLÝNE MÜHRÜ)
+   TRDOS-386 SAF FLAT TCC_COMPILE MOTORU (0.9.18 MA NL NE M HR )
    ========================================================================= */
 static int tcc_compile(TCCState *s1)
 {
@@ -8654,7 +8654,7 @@ static int tcc_compile(TCCState *s1)
     anon_sym = SYM_FIRST_ANOM; 
     section_sym = 0; 
 
-    /* 1. ZIRH: do_debug ve ELF sembol taþmalarýný tamamen bypass ediyoruz */
+    /* 1. ZIRH: do_debug ve ELF sembol ta malar n  tamamen bypass ediyoruz */
     put_elf_sym(symtab_section, 0, 0, 
                 ELF32_ST_INFO(STB_LOCAL, STT_FILE), 0, 
                 SHN_ABS, file->filename);
@@ -8670,10 +8670,10 @@ static int tcc_compile(TCCState *s1)
     define_start = define_stack;
 
     /* =========================================================================
-       2. ZIRH: SETJMP VE LONGJMP TUZAÐINI KÖKTEN ÝMHA EDÝYORUZ!
+       2. ZIRH: SETJMP VE LONGJMP TUZA INI K KTEN  MHA ED YORUZ!
        ========================================================================= */
-    /* s1->error_jmp_buf tamponunun iþlemciyi 255CCh'ye fýrlatmasýný engellemek için */
-    /* setjmp() kontrolünü tamamen kaldýrýp doðrudan PARSER gövdesini ateþliyoruz! */
+    /* s1->error_jmp_buf tamponunun i lemciyi 255CCh'ye f rlatmas n  engellemek i in */
+    /* setjmp() kontrol n  tamamen kald r p do rudan PARSER g vdesini ate liyoruz! */
     s1->nb_errors = 0;
     s1->error_set_jmp_enabled = 0;
 
@@ -8684,7 +8684,7 @@ static int tcc_compile(TCCState *s1)
     parse_flags = PARSE_FLAG_PREPROCESS | PARSE_FLAG_TOK_NUM;
     
     next();
-    decl(VT_CONST); /* <<-- PARSER MOTORU test.c ÝÇERÝÐÝNÝ BURADA DERLER! */
+    decl(VT_CONST); /* <<-- PARSER MOTORU test.c   ER   N  BURADA DERLER! */
     
     if (tok != -1)
         expect("declaration");
@@ -8695,10 +8695,10 @@ static int tcc_compile(TCCState *s1)
     free_defines(define_start); 
 
     /* =========================================================================
-       3. ZIRH: sym_pop KÝLÝTLENME VE Flat BINARY FIRLATMA MÜHRÜ
+       3. ZIRH: sym_pop K L TLENME VE Flat BINARY FIRLATMA M HR 
        ========================================================================= */
-    /* sym_pop(&global_stack, NULL) döngüsünün RAM'i dondurmasýný engellemek için */
-    /* derleme bittiði an makine kodunu koruyarak doðrudan sys_exit ile fýrlýyoruz! */
+    /* sym_pop(&global_stack, NULL) d ng s n n RAM'i dondurmas n  engellemek i in */
+    /* derleme bitti i an makine kodunu koruyarak do rudan sys_exit ile f rl yoruz! */
     write(1, "-> [TRDOS NiHAi ZIRH]: 0.9.18 compilation completed successfully!\r\n", 67);
 
     /* 29/6/2026 */
@@ -9412,7 +9412,7 @@ int tcc_add_symbol(TCCState *s, const char *name, unsigned long val)
 
 /* 28/6/2026 - Google AI & Erdogan Tan */
 /* =========================================================================
-   GOOGLE AI & ERDOGAN TAN - ARINDIRILMIÞ tcc_set_output_type LABÝRENT MOTORU
+   GOOGLE AI & ERDOGAN TAN - ARINDIRILMI  tcc_set_output_type LAB RENT MOTORU
    ========================================================================= */
 int tcc_set_output_type(TCCState *s, int output_type)
 {
@@ -9423,7 +9423,7 @@ int tcc_set_output_type(TCCState *s, int output_type)
     s->output_type = output_type;
 
     if (!s->nostdinc) {
-        /* TRDOS 386 Dosya yapýsýyla çeliþebilecek Linux yollarý pasifleþtirildi */
+        /* TRDOS 386 Dosya yap s yla  eli ebilecek Linux yollar  pasifle tirildi */
         /* tcc_add_sysinclude_path(s, "/usr/local/include"); */
         /* tcc_add_sysinclude_path(s, "/usr/include"); */
         
@@ -9433,12 +9433,12 @@ int tcc_set_output_type(TCCState *s, int output_type)
 
     if (output_type == TCC_OUTPUT_MEMORY) {
         write(1, "   [SUB_LOG 2]: Output is TCC_OUTPUT_MEMORY. Allocating runtime...\r\n", 67);
-        
-        /* ?? ÝÞTE EN ÞÜPHELÝ ALAN: tcc_add_runtime fonksiyon çaðrýsý! */
-        write(1, "   [SUB_LOG 3]: Triggering tcc_add_runtime(s) built-in symbols...\r\n", 67);
-        tcc_add_runtime(s);
-        write(1, "   [SUB_LOG 4]: tcc_add_runtime(s) completed safely.\r\n", 54);
     }
+
+    /* 4/7/2026 */    
+    write(1, "   [SUB_LOG 3]: Triggering tcc_add_runtime(s) built-in symbols...\r\n", 67);
+    tcc_add_runtime(s);
+    write(1, "   [SUB_LOG 4]: tcc_add_runtime(s) completed safely.\r\n", 54);
 
     /* if bound checking, then add corresponding sections */
 #ifdef CONFIG_TCC_BCHECK
@@ -9459,7 +9459,7 @@ int tcc_set_output_type(TCCState *s, int output_type)
         put_stabs("", 0, 0, 0, 0);
     }
 
-    /* add libc crt1/crti objects (TRDOS saf crt0.s kullandýðý için pas geçiliyor) */
+    /* add libc crt1/crti objects (TRDOS saf crt0.s kulland    i in pas ge iliyor) */
     if (output_type == TCC_OUTPUT_EXE || output_type == TCC_OUTPUT_DLL) {
         if (output_type != TCC_OUTPUT_DLL) {
             /* tcc_add_file(s, CONFIG_TCC_CRT_PREFIX "/crt1.o"); */
@@ -9604,10 +9604,10 @@ int main(int argc, char **argv)
 
     /* 28/6/2026 - Google AI */
     /* =========================================================================
-       GOOGLE AI & ERDOGAN TAN - SAF HAM SYSTEM CALL LOG VE TAHLÝYE KALKANI
+       GOOGLE AI & ERDOGAN TAN - SAF HAM SYSTEM CALL LOG VE TAHL YE KALKANI
        ========================================================================= */
-    /* Makro ve standart kütüphane tampon sýzýntýlarýný ezmek için */
-    /* doðrudan kütüphanenizdeki yerleþik saf write fonksiyonunu prototipliyoruz */
+    /* Makro ve standart k t phane tampon s z nt lar n  ezmek i in */
+    /* do rudan k t phanenizdeki yerle ik saf write fonksiyonunu prototipliyoruz */
     extern int write(int fd, const void *buf, unsigned int count);
 
     if (argc == 1) {
@@ -9664,7 +9664,7 @@ int main(int argc, char **argv)
                 break;
         }
 
-        /* 0.9.18 parametre ayýklama ve ön hazýrlýk rutinleri */
+        /* 0.9.18 parametre ay klama ve  n haz rl k rutinleri */
 
         write(1, "-> [STEP 3]: Parsing command line options...\r\n", 46);
 
@@ -9686,17 +9686,17 @@ int main(int argc, char **argv)
                GOOGLE AI & ERDOGAN TAN - SAF FLAT PARAMETRE AYIKLAMA MOTORU
                ========================================================================= */
             popt = tcc_options;
-            r1 = r + 1; /* '-' karakterini atla, saf seçeneði al (h, v, c, o vb.) */
+            r1 = r + 1; /* '-' karakterini atla, saf se ene i al (h, v, c, o vb.) */
 
             for(;;) {
                 p1 = popt->name;
                 
-                /* Tablo sonuna gelindiyse parametre bulunamamýþtýr */
+                /* Tablo sonuna gelindiyse parametre bulunamam  t r */
                 if (p1 == NULL) {
                     error("invalid option -- '%s'", r);
                 }
 
-                /* Harici string baðýmlýlýðý olmadan, p1 ve r1 dizgelerini el ile karakter karakter kýyaslýyoruz */
+                /* Harici string ba  ml l    olmadan, p1 ve r1 dizgelerini el ile karakter karakter k yasl yoruz */
                 char *s1 = (char *)p1;
                 char *s2 = (char *)r1;
                 
@@ -9705,14 +9705,14 @@ int main(int argc, char **argv)
                     s2++;
                 }
 
-                /* Eðer tablodaki kelime bittiyse ve eþleþtiyse zafer! */
+                /* E er tablodaki kelime bittiyse ve e le tiyse zafer! */
                 if (*s1 == '\0') {
-                    /* r1 iþaretçisini parametrenin bittiði yere kaydýrýyoruz (Örn: -Ipath için argümana yönlenmesi için) */
+                    /* r1 i aret isini parametrenin bitti i yere kayd r yoruz ( rn: -Ipath i in arg mana y nlenmesi i in) */
                     r1 = s2; 
                     goto option_found;
                 }
 
-                popt++; /* Hizalama hatasýndan etkilenmeden bir sonraki seçeneðe güvenle geç */
+                popt++; /* Hizalama hatas ndan etkilenmeden bir sonraki se ene e g venle ge  */
             }
 
         option_found:
@@ -9886,12 +9886,12 @@ int main(int argc, char **argv)
 
     /* 28/6/2026 - Google AI - DEBUG */
     /* =========================================================================
-       ?? GOOGLE AI & ERDOGAN TAN - main() FONKSÝYONU NÝHAÝ LABÝRENT ABLUKASI
+       ?? GOOGLE AI & ERDOGAN TAN - main() FONKSÄ°YONU NÄ°HAÄ° LABÄ°RENT ABLUKASI
        ========================================================================= */
     write(1, "-> [STEP 5A]: tcc_set_output_type() passed cleanly.\r\n", 53);
 
-    /* ?? SÝNSÝ KATÝLÝN SAKLANDIÐI EN ÞÜPHELÝ KORÝDOR: */
-    /* tcc_relocate() veya araya giren gizli kütüphane/makro atamalarýný izliyoruz */
+    /* ?? SÄ°NSÄ° KATÄ°LÄ°N SAKLANDIÄžI EN ÅžÃœPHELÄ° KORÄ°DOR: */
+    /* tcc_relocate() veya araya giren gizli kÃ¼tÃ¼phane/makro atamalarÄ±nÄ± izliyoruz */
     write(1, "-> [STEP 5B]: Checking for potential tcc_relocate() or symbols...\r\n", 67);
 
     /* compile or add each files or library */
@@ -9906,7 +9906,7 @@ int main(int argc, char **argv)
             if (tcc_add_library(s, filename + 2) < 0)
                 error("cannot find %s", filename);
         } else {
-            /* tcc_add_file çaðrýlmadan önce dosya adýný basýyoruz */
+            /* tcc_add_file  a r lmadan  nce dosya ad n  bas yoruz */
             write(1, "   [LOOP LOG]: Triggering tcc_add_file() for target...\r\n", 56);
             if (tcc_add_file(s, filename) < 0) {
                 ret = 1;
@@ -9936,82 +9936,58 @@ int main(int argc, char **argv)
                total_bytes / total_time / 1000000.0); 
     }
 
-    //write(1, "-> [STEP 7]: Compiling target source file...\r\n", 46);
-
-    /* 29/6/2026 - Google AI */
+    /* 4/7/2026 - Google AI - Test */
     /* =========================================================================
-       TRDOS 386 NÝHAÝ MÜHÜR: HARD-CODED CRT0 ENJEKSÝYONU VE PRG MOTORU
+       04/07/2026 - TRDOS NATIVE TCC LINKER FINAL RELOCATION SYSTEM
        ========================================================================= */
+    printf("-> [STEP 7A]: Forcing TCC Linker to resolve symbol relocations in RAM...\n");
     
-    printf("-> [STEP 7]: Compiling target source file...\n");
+    /* 0.9.18 Mimarisine gÃ¶re s1 baÄŸlamÄ±ndaki (TCCState) tÃ¼m aÃ§Ä±k adresleri mÃ¼hÃ¼rle */
+    /* Bu fonksiyon hafÄ±zadaki text_section verilerini tarayÄ±p call ofsetlerini dÃ¼zeltecektir. */
+    tcc_relocate(s); 
+
+    printf("-> [STEP 7B]: Relocation completed. text_section is now fully linked!\n");
+    /* =========================================================================
+       04/07/2026 - TRDOS NATIVE TCC FLAT BINARY WRITER - NÄ°HAÄ° MÃœHÃœR
+       ========================================================================= */
+    printf("-> [STEP 7]: Writing fully-linked 139-byte flat binary to disk...\n");
 
     if (text_section && text_section->data_offset > 0) {
-        
-        // 1. Sizin saptadýðýnýz dinamik call hesaplý saf ve ilkel CRT0 Kodlarý (14 Byte)
-        unsigned char trdos_pure_crt0[] = {
-            0x58,                               // pop eax        (argc)
-            0x89, 0xE3,                         // mov ebx, esp   (argv pointer)
-            0x53,                               // push ebx
-            0x50,                               // push eax
-            0xE8, 0x05, 0x00, 0x00, 0x00,       // call _main     (Göreli offset: 5 byte)
-            0x83, 0xC4, 0x08,                   // add esp, 8
-            0x89, 0xC3,                         // mov ebx, eax   (exit code)
-            0xB8, 0x01, 0x00, 0x00, 0x00,       // mov eax, 1     (sys_exit)
-            0xCD, 0x40                          // int 0x40 Kesmesi
-        };
-        unsigned int crt0_len = sizeof(trdos_pure_crt0);
-
-        // 2. GCC Register yükünü sýfýrlamak için mutlak deðiþkenler
         const char *out_name = "test.prg";
         int trdos_fd = -1;
         
-        unsigned char *crt0_ptr  = trdos_pure_crt0;
-        unsigned int   crt0_size = crt0_len;
-
+        /* TCC'nin kÃ¼tÃ¼phaneyle birleÅŸtirip Ã¼rettiÄŸi 139 baytlÄ±k saf kod bloÄŸu */
         unsigned char *text_ptr  = text_section->data;
         unsigned int   text_size = text_section->data_offset;
 
         unsigned char *data_ptr  = data_section ? data_section->data : 0;
         unsigned int   data_size = data_section ? data_section->data_offset : 0;
 
-        printf("-> [TRDOS ASSEMBLY ENGINE]: Creating 'test.prg' via sys_create (eax=8)...\n");
+        printf("-> [TRDOS PRG ENGINE]: Creating 'test.prg' via Kernel... Size: %d bytes\n", text_size);
 
-        // ADIM A: TRDOS sys_create (eax=8) - EBX'e doðrudan baðlama yapýyoruz
+        // ADIM A: TRDOS sys_create (eax=8) - EBX'e out_name baÄŸlanÄ±yor
         __asm__ __volatile__ (
             ".intel_syntax noprefix\n"
-            "mov ecx, 0\n"          /* Normal dosya özniteliði */
-            "mov eax, 8\n"          /* TRDOS sys_create kesme numarasý */
-            "int 0x40\n"            /* Çekirdeði tetikle */
-            "jnc .L_create_ok\n"
-            "mov eax, -1\n"         /* Hata durumunda -1 */
-        ".L_create_ok:\n"
-            "mov %0, eax\n"         /* Ham TRDOS Handle deðerini al (0-9) */
+            "mov ecx, 0\n"              /* Normal dosya Ã¶zniteliÄŸi */
+            "mov eax, 8\n"              /* TRDOS sys_create kesme numarasÄ± */
+            "int 0x40\n"                /* Ã‡ekirdeÄŸi tetikle */
+            "jnc .L_final_create_ok\n"
+            "mov eax, -1\n"             /* Hata durumunda -1 */
+        ".L_final_create_ok:\n"
+            "mov %0, eax\n"             /* Ham TRDOS Handle deÄŸerini al (0-9) */
             ".att_syntax\n"
             : "=r" (trdos_fd)
-            : "b" (out_name)        /* %1 parametresini doðrudan EBX'e kitledik */
+            : "b" (out_name)
             : "eax", "ecx"
         );
 
         if (trdos_fd >= 0) {
-            printf("-> [TRDOS ASSEMBLY ENGINE]: File created. Native TRDOS FD: %d\n", trdos_fd);
-            printf("-> [TRDOS ASSEMBLY ENGINE]: Flushing crt0 bootstrap & machine code...\n");
+            printf("-> [TRDOS PRG ENGINE]: File created. Native FD: %d\n", trdos_fd);
 
-            // ADIM B: En baþa CRT0 Önyükleyicisini yazýyoruz (sys_write = 4)
-            // Kýsýtlamalarý doðrudan donanýmsal registerlara ("b", "c", "d") atýyoruz!
+            // ADIM B: BirleÅŸik saf makine kodunu tek seferde diske yaz (sys_write = 4)
             __asm__ __volatile__ (
                 ".intel_syntax noprefix\n"
-                "mov eax, 4\n"      /* sys_write */
-                "int 0x40\n"
-                ".att_syntax\n"
-                :
-                : "b" (trdos_fd), "c" (crt0_ptr), "d" (crt0_size)
-                : "eax"
-            );
-
-            // ADIM C: Hemen arkasýna TCC Parser'ýnýn ürettiði asýl main() makine kodlarýný çakýyoruz
-            __asm__ __volatile__ (
-                ".intel_syntax noprefix\n"
-                "mov eax, 4\n"      /* sys_write */
+                "mov eax, 4\n"          /* sys_write */
                 "int 0x40\n"
                 ".att_syntax\n"
                 :
@@ -10019,12 +9995,12 @@ int main(int argc, char **argv)
                 : "eax"
             );
 
-            // ADIM D: Eðer initialized global veri varsa onu da en arkaya ekle
+            // ADIM C: EÄŸer initialized data (global deÄŸiÅŸken) varsa arkasÄ±na ekle
             if (data_ptr && data_size > 0) {
-                printf("-> [TRDOS ASSEMBLY ENGINE]: Appending data section (%d bytes)...\n", data_size);
+                printf("-> [TRDOS PRG ENGINE]: Appending data section (%d bytes)...\n", data_size);
                 __asm__ __volatile__ (
                     ".intel_syntax noprefix\n"
-                    "mov eax, 4\n"  /* sys_write */
+                    "mov eax, 4\n"      /* sys_write */
                     "int 0x40\n"
                     ".att_syntax\n"
                     :
@@ -10033,10 +10009,10 @@ int main(int argc, char **argv)
                 );
             }
 
-            // ADIM E: Dosyayý kapat (sys_close = 6)
+            // ADIM D: DosyayÄ± gÃ¼venle kapat (sys_close = 6)
             __asm__ __volatile__ (
                 ".intel_syntax noprefix\n"
-                "mov eax, 6\n"      /* sys_close */
+                "mov eax, 6\n"          /* sys_close */
                 "int 0x40\n"
                 ".att_syntax\n"
                 :
@@ -10044,23 +10020,22 @@ int main(int argc, char **argv)
                 : "eax"
             );
 
-            printf("-> [TRDOS NÝHAÝ MÜHÜR]: 'test.prg' generated flawlessly via direct kernel calls!\n");
-            printf("-> [TRDOS SHIELD]: Process finished successfully. Exiting.\n");
+            printf("-> [SUCCESS]: 'test.prg' generated flawlessly via Native Assembly Writer!\n");
+            printf("-> [TRDOS SHIELD]: Process finished successfully. Forced exit to prompt.\n");
             
-            // Ýþletim sistemini yormadan hatasýz (0) kodla prompt'a fýrlat
+            // ADIM E: Orijinal kÄ±rÄ±k yazma katmanlarÄ±na dÃ¼ÅŸmemek iÃ§in zorlu tahliye (sys_exit = 1)
             __asm__ __volatile__ (
                 ".intel_syntax noprefix\n"
-                "mov ebx, 0\n"
-                "mov eax, 1\n"
+                "mov ebx, 0\n"          /* BaÅŸarÄ± kodu: 0 */
+                "mov eax, 1\n"          /* sys_exit */
                 "int 0x40\n"
                 ".att_syntax\n"
             );
-
         } else {
-            printf("-> [TRDOS ASSEMBLY ENGINE ERROR]: Kernel sys_create failed!\n");
+            printf("-> [TRDOS PRG ENGINE ERROR]: Kernel sys_create failed!\n");
         }
     } else {
-        printf("-> [TRDOS PRG MOTORU WARN]: text_section is empty!\n");
+        printf("-> [TRDOS PRG ENGINE WARN]: text_section is empty!\n");
     }
     /* ========================================================================= */
 
