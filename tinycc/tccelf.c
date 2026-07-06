@@ -776,28 +776,36 @@ static void put_dt(Section *dynamic, int dt, unsigned long val)
     dyn->d_un.d_val = val;
 }
 
-/* 4/7/2026 - Google AI - Test */
-/* 04/07/2026 - TRDOS 386 NATIVE PATH ALIGNMENT */
+/* 5/7/2026 - Google AI */
+static int trdos_runtime_injected = 0;
+
+/* 5/7/2026 - 4/7/2026 */
 /* add tcc runtime libraries */
 static void tcc_add_runtime(TCCState *s1)
 {
-   char buf[1024];
-   extern int write(int fd, const void *buf, unsigned int count);
-
-   write(1, "      [RUNTIME LOG]: Injecting new TRDOS crt0.o from D:/TCC/LIB...\r\n", 68);
-
-   /* Doğrudan LIB altındaki yeni crt0.o dosyasını hedefliyoruz */
-   snprintf(buf, sizeof(buf), "d:/tcc/lib/%s", "crt0.o");
-   
-   /* TCC Linker hattına dahil et */
-//   int r_check = tcc_add_file(s1, buf);
-int r_check = tcc_add_file(s1, "d:/tcc/lib/crt0.o");
-
-   if (r_check < 0) {
-       write(1, "\r\n   [LINKER CRITICAL HINT]: Failed to load crt0.o from disk!\r\n", 64);
-   } else {
-       write(1, "\r\n   [LINKER SUCCESS]: crt0.o loaded into linker table successfully!\r\n", 71);
+   if (trdos_runtime_injected != 0) {
+       return; 
    }
+   trdos_runtime_injected = 1;
+
+   char buf[1024];
+
+   /* 1. CRT0.O (4.1 chars) -> Başlangıç kodu */
+   snprintf(buf, sizeof(buf), "d:/tcc/lib/%s", "crt0.o");
+   tcc_add_file(s1, buf);
+
+   /* 2. WRITE.O (5.1 chars) -> Yerel Kesme Girdi/Çıktı motoru */
+   /* Not: _write.o ismindeki alt çizgi yerine saf write.o yapıyoruz */
+   snprintf(buf, sizeof(buf), "d:/tcc/lib/%s", "write.o");
+   tcc_add_file(s1, buf);
+
+   /* 3. STRING.O (6.1 chars) -> Yerel itoa, itoab, strlen kütüphanesi */
+   snprintf(buf, sizeof(buf), "d:/tcc/lib/%s", "string.o");
+   tcc_add_file(s1, buf);
+
+   /* 4. PRINTF.O (6.1 chars) -> Yerel printf/snprintf format kalkanı */
+   snprintf(buf, sizeof(buf), "d:/tcc/lib/%s", "printf.o");
+   tcc_add_file(s1, buf);
 }
 
 /* name of ELF interpreter */
@@ -1051,6 +1059,7 @@ int tcc_output_file(TCCState *s1, const char *filename)
     phdr = tcc_mallocz(phnum * sizeof(Elf32_Phdr));
         
     file_offset = sizeof(Elf32_Ehdr) + phnum * sizeof(Elf32_Phdr);
+
     if (phnum > 0) {
         /* compute section to program header mapping */
         if (file_type == TCC_OUTPUT_DLL)
@@ -1144,8 +1153,20 @@ int tcc_output_file(TCCState *s1, const char *filename)
             ph++;
             /* if in the middle of a page, we duplicate the page in
                memory so that one copy is RX and the other is RW */
-            if ((addr & (ELF_PAGE_SIZE - 1)) != 0)
-                addr += ELF_PAGE_SIZE;
+            // if ((addr & (ELF_PAGE_SIZE - 1)) != 0)
+            //    addr += ELF_PAGE_SIZE;
+        /* 05/07/2026 - TRDOS STRICT FLAT PRG DATA ALIGNMENT CORRECTION */
+        /* TRDOS flat modda kod ve veri arasında sayfa katlaması (page duplication) YAPMA! */
+        /* Sadece 4-baytlık dword hizalaması yeterlidir. */
+        #if 1
+          /* TRDOS flat mühürleme katmanı: Sayfa atlamasını tamamen eziyoruz! */
+          addr = (addr + 3) & ~3; 
+        #else
+          /* Eski Linux/Win32 sayfalama mekanizması devredışı bırakıldı */
+          if ((addr & (ELF_PAGE_SIZE - 1)) != 0)
+              addr += ELF_PAGE_SIZE;
+        #endif
+
         }
 
         /* if interpreter, then add corresponing program header */
@@ -1242,7 +1263,7 @@ int tcc_output_file(TCCState *s1, const char *filename)
         if (s->sh_type != SHT_NOBITS)
             file_offset += s->sh_size;
     }
-    
+ 
     /* if building executable or DLL, then relocate each section
        except the GOT which is already relocated */
     if (file_type != TCC_OUTPUT_OBJ) {

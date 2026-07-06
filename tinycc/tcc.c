@@ -656,10 +656,19 @@ static const char tcc_keywords[] =
 
 #define TOK_UIDENT TOK_DEFINE
 
-#ifdef WIN32
-#define snprintf _snprintf
-#define vsnprintf _vsnprintf
-#endif
+// /* 5/7/2026 */
+// #ifdef WIN32
+// #define snprintf _snprintf
+// #define vsnprintf _vsnprintf
+// #endif
+#undef snprintf
+#undef _snprintf
+
+/* TRDOS 386 libc_printf_bridge.s içindeki yerel snprintf köprüsü */
+extern int trdos_snprintf(char *str, unsigned int size, const char *format, ...);
+
+#define snprintf trdos_snprintf
+#define _snprintf trdos_snprintf
 
 #if defined(WIN32) || defined(TCC_UCLIBC) || defined(__FreeBSD__)
 /* currently incorrect */
@@ -9459,7 +9468,7 @@ int tcc_set_output_type(TCCState *s, int output_type)
         put_stabs("", 0, 0, 0, 0);
     }
 
-    /* add libc crt1/crti objects (TRDOS saf crt0.s kulland    i in pas ge iliyor) */
+    /* add libc crt1/crti objects (TRDOS saf crt0.s kullandığı için pas geçiliyor) */
     if (output_type == TCC_OUTPUT_EXE || output_type == TCC_OUTPUT_DLL) {
         if (output_type != TCC_OUTPUT_DLL) {
             /* tcc_add_file(s, CONFIG_TCC_CRT_PREFIX "/crt1.o"); */
@@ -9618,7 +9627,7 @@ int main(int argc, char **argv)
         write(1, "  -o outfile  set output file name\r\n", 37);
         write(1, "  -v          display tcc version\r\n", 35);
         
-        /* TRDOS Zorlu Tahliye (Forced Exit) Kesmesi */
+        /* TRDOS Zorunlu Çıkış (Forced Exit) Kesmesi */
         __asm__ __volatile__ (
             ".intel_syntax noprefix\n"
             "mov ebx, 0\n"
@@ -9664,7 +9673,7 @@ int main(int argc, char **argv)
                 break;
         }
 
-        /* 0.9.18 parametre ay klama ve  n haz rl k rutinleri */
+        /* 0.9.18 parametre ayıklama ve ön hazırlık rutinleri */
 
         write(1, "-> [STEP 3]: Parsing command line options...\r\n", 46);
 
@@ -9686,17 +9695,17 @@ int main(int argc, char **argv)
                GOOGLE AI & ERDOGAN TAN - SAF FLAT PARAMETRE AYIKLAMA MOTORU
                ========================================================================= */
             popt = tcc_options;
-            r1 = r + 1; /* '-' karakterini atla, saf se ene i al (h, v, c, o vb.) */
+            r1 = r + 1; /* '-' karakterini atla, saf seçeneği al (h, v, c, o vb.) */
 
             for(;;) {
                 p1 = popt->name;
                 
-                /* Tablo sonuna gelindiyse parametre bulunamam  t r */
+                /* Tablo sonuna gelindiyse parametre bulunamamıştır */
                 if (p1 == NULL) {
                     error("invalid option -- '%s'", r);
                 }
 
-                /* Harici string ba  ml l    olmadan, p1 ve r1 dizgelerini el ile karakter karakter k yasl yoruz */
+                /* Harici string bağımlılığı olmadan, p1 ve r1 dizgelerini el ile karakter karakter kıyaslıyoruz */
                 char *s1 = (char *)p1;
                 char *s2 = (char *)r1;
                 
@@ -9705,14 +9714,14 @@ int main(int argc, char **argv)
                     s2++;
                 }
 
-                /* E er tablodaki kelime bittiyse ve e le tiyse zafer! */
+                /* Eğer tablodaki kelime bittiyse ve eşleştiyse zafer! */
                 if (*s1 == '\0') {
-                    /* r1 i aret isini parametrenin bitti i yere kayd r yoruz ( rn: -Ipath i in arg mana y nlenmesi i in) */
+                    /* r1 i aret isini parametrenin bittiği yere kaydırıyoruz (örn: -Ipath için argümana yönlenmesi için) */
                     r1 = s2; 
                     goto option_found;
                 }
 
-                popt++; /* Hizalama hatas ndan etkilenmeden bir sonraki se ene e g venle ge  */
+                popt++; /* Hizalama hatasından etkilenmeden bir sonraki seçeneğe güvenle geç */
             }
 
         option_found:
@@ -9941,7 +9950,7 @@ int main(int argc, char **argv)
        04/07/2026 - TRDOS NATIVE TCC LINKER FINAL RELOCATION SYSTEM
        ========================================================================= */
     printf("-> [STEP 7A]: Forcing TCC Linker to resolve symbol relocations in RAM...\n");
-    
+
     /* 0.9.18 Mimarisine göre s1 bağlamındaki (TCCState) tüm açık adresleri mühürle */
     /* Bu fonksiyon hafızadaki text_section verilerini tarayıp call ofsetlerini düzeltecektir. */
     tcc_relocate(s); 
@@ -9950,13 +9959,13 @@ int main(int argc, char **argv)
     /* =========================================================================
        04/07/2026 - TRDOS NATIVE TCC FLAT BINARY WRITER - NİHAİ MÜHÜR
        ========================================================================= */
-    printf("-> [STEP 7]: Writing fully-linked 139-byte flat binary to disk...\n");
+    printf("-> [STEP 7]: Writing fully-linked flat binary to disk...\n");
 
     if (text_section && text_section->data_offset > 0) {
-        const char *out_name = "test.prg";
+        const char *out_name = "TEST.PRG";
         int trdos_fd = -1;
         
-        /* TCC'nin kütüphaneyle birleştirip ürettiği 139 baytlık saf kod bloğu */
+        /* TCC'nin kütüphaneyle birleştirip ürettiği saf kod bloğu */
         unsigned char *text_ptr  = text_section->data;
         unsigned int   text_size = text_section->data_offset;
 
@@ -10023,7 +10032,7 @@ int main(int argc, char **argv)
             printf("-> [SUCCESS]: 'test.prg' generated flawlessly via Native Assembly Writer!\n");
             printf("-> [TRDOS SHIELD]: Process finished successfully. Forced exit to prompt.\n");
             
-            // ADIM E: Orijinal kırık yazma katmanlarına düşmemek için zorlu tahliye (sys_exit = 1)
+            // ADIM E: Orijinal kırık yazma katmanlarına düşmemek için zorunlu çıkış (sys_exit = 1)
             __asm__ __volatile__ (
                 ".intel_syntax noprefix\n"
                 "mov ebx, 0\n"          /* Başarı kodu: 0 */
@@ -10039,12 +10048,13 @@ int main(int argc, char **argv)
     }
     /* ========================================================================= */
 
-    if (s->output_type != TCC_OUTPUT_MEMORY) {
-        tcc_output_file(s, outfile);
-        ret = 0;
-    } else {
-        ret = tcc_run(s, argc - optind, argv + optind);
-    }
+    /* 5/7/2026 */
+    // if (s->output_type != TCC_OUTPUT_MEMORY) {
+    //    tcc_output_file(s, outfile);
+    //    ret = 0;
+    // } else {
+    //    ret = tcc_run(s, argc - optind, argv + optind);
+    // }
  the_end:
     /* XXX: cannot do it with bound checking because of the malloc hooks */
     if (!do_bounds_check)
