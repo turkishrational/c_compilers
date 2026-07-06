@@ -9030,11 +9030,19 @@ static void sig_error(int signum, siginfo_t *siginf, void *puc)
 }
 #endif
 
+/* 7/7/2026 - Google AI */
 /* do all relocations (needed before using tcc_get_symbol()) */
 int tcc_relocate(TCCState *s1)
 {
     Section *s;
     int i;
+    
+    // TCC 0.9.18 Mimarisine tam uyumlu find_section sarmalayıcıları
+    unsigned int flat_current_offset = 0;
+    Section *text_sec   = find_section(s1, ".text");
+    Section *rodata_sec = find_section(s1, ".rodata");
+    Section *data_sec   = find_section(s1, ".data");
+    Section *bss_sec    = find_section(s1, ".bss");
 
     s1->nb_errors = 0;
     
@@ -9042,17 +9050,57 @@ int tcc_relocate(TCCState *s1)
 
     relocate_common_syms();
 
-    /* compute relocation address : section are relocated in place. We
-       also alloc the bss space */
+    /* =========================================================================
+       07/07/2026 - TRDOS NATIVE TCC FLAT ADDRESS ALIGNMENT ENGINE (V2 REPAIR)
+       ========================================================================= */
+    printf("-> [FLAT LINKER]: Overriding TCC memory allocation for TRDOS 386...\n");
+
+    // 1. .text (Kod) segmenti her zaman 0 adresinden başlar
+    if (text_sec) {
+        text_sec->sh_addr = 0;
+        flat_current_offset = text_sec->sh_addr + text_sec->data_offset;
+        printf("-> [FLAT LINKER]: .text base: 0x00000000, Size: %d bytes\n", text_sec->data_offset);
+    }
+
+    // 2. .rodata (Sabit stringler) varsa .text segmentinin hemen arkasına mühürlenir
+    if (rodata_sec) {
+        rodata_sec->sh_addr = flat_current_offset;
+        printf("-> [FLAT LINKER]: .rodata sh_addr: 0x%X, Size: %d bytes\n", rodata_sec->sh_addr, rodata_sec->data_offset);
+        flat_current_offset += rodata_sec->data_offset;
+    }
+
+    // 3. .data (Global değişkenler) varsa rodata/text sonrasına ardışık eklenir
+    if (data_sec) {
+        data_sec->sh_addr = flat_current_offset;
+        printf("-> [FLAT LINKER]: .data sh_addr: 0x%X, Size: %d bytes\n", data_sec->sh_addr, data_sec->data_offset);
+        flat_current_offset += data_sec->data_offset;
+    }
+
+    // 4. .bss (Uninitialized data) için bss alanını tahsis et ve adresi en arkaya bağla
+    if (bss_sec) {
+        if (bss_sec->data_offset > 0) {
+            bss_sec->data = tcc_mallocz(bss_sec->data_offset);
+        }
+        bss_sec->sh_addr = flat_current_offset;
+        printf("-> [FLAT LINKER]: .bss sh_addr: 0x%X, Size: %d bytes\n", bss_sec->sh_addr, bss_sec->data_offset);
+    }
+
+    // Diğer allocatesiz veya harici segmentlerin JIT uyumluluğu kontrolü
     for(i = 1; i < s1->nb_sections; i++) {
         s = s1->sections[i];
         if (s->sh_flags & SHF_ALLOC) {
-            if (s->sh_type == SHT_NOBITS)
+            if (s->sh_type == SHT_NOBITS && s != bss_sec) {
                 s->data = tcc_mallocz(s->data_offset);
-            s->sh_addr = (unsigned long)s->data;
+            }
+            // Bizim yukarıda el ile hizaladığımız 4 ana segment dışındakileri elleme
+            if (s != text_sec && s != rodata_sec && s != data_sec && s != bss_sec) {
+                s->sh_addr = (unsigned long)s->data;
+            }
         }
     }
+    /* ========================================================================= */
 
+    // Yeniden hesaplanan kusursuz Flat adreslere göre sembolleri çözümle
     relocate_syms(s1, 1);
 
     if (s1->nb_errors != 0)
@@ -9961,16 +10009,13 @@ int main(int argc, char **argv)
        ========================================================================= */
     printf("-> [STEP 7]: Writing fully-linked flat binary to disk...\n");
 
+    unsigned char *text_ptr  = text_section->data;
+    unsigned int   text_size = text_section->data_offset;
+
     if (text_section && text_section->data_offset > 0) {
         const char *out_name = "TEST.PRG";
-        int trdos_fd = -1;
         
-        /* TCC'nin kütüphaneyle birleştirip ürettiği saf kod bloğu */
-        unsigned char *text_ptr  = text_section->data;
-        unsigned int   text_size = text_section->data_offset;
-
-        unsigned char *data_ptr  = data_section ? data_section->data : 0;
-        unsigned int   data_size = data_section ? data_section->data_offset : 0;
+        int trdos_fd = -1;
 
         printf("-> [TRDOS PRG ENGINE]: Creating 'test.prg' via Kernel... Size: %d bytes\n", text_size);
 
@@ -9983,17 +10028,17 @@ int main(int argc, char **argv)
             "jnc .L_final_create_ok\n"
             "mov eax, -1\n"             /* Hata durumunda -1 */
         ".L_final_create_ok:\n"
-            "mov %0, eax\n"             /* Ham TRDOS Handle değerini al (0-9) */
+            "mov %0, eax\n"             /* C'deki trdos_fd'nin gerçek bellek adresine yazar */
             ".att_syntax\n"
-            : "=r" (trdos_fd)
-            : "b" (out_name)
+            : "=r" (trdos_fd)           /* Çıktı değişkeni bağı doğrudan kurulur */
+            : "b" (out_name)            /* Dosya adı EBX'e tam hizalanır */
             : "eax", "ecx"
         );
 
         if (trdos_fd >= 0) {
             printf("-> [TRDOS PRG ENGINE]: File created. Native FD: %d\n", trdos_fd);
 
-            // ADIM B: Birleşik saf makine kodunu tek seferde diske yaz (sys_write = 4)
+            // Birleşik saf makine kodunu tek seferde diske yaz (sys_write = 4)
             __asm__ __volatile__ (
                 ".intel_syntax noprefix\n"
                 "mov eax, 4\n"          /* sys_write */
@@ -10004,8 +10049,11 @@ int main(int argc, char **argv)
                 : "eax"
             );
 
-            // ADIM C: Eğer initialized data (global değişken) varsa arkasına ekle
-            if (data_ptr && data_size > 0) {
+            // ADIM B: Eğer initialized data (global değişken) varsa arkasına ekle
+            if (data_section && data_section->data_offset > 0) {
+                unsigned char *data_ptr = data_section->data;
+                unsigned  int data_size = data_section->data_offset;
+
                 printf("-> [TRDOS PRG ENGINE]: Appending data section (%d bytes)...\n", data_size);
                 __asm__ __volatile__ (
                     ".intel_syntax noprefix\n"
@@ -10016,9 +10064,9 @@ int main(int argc, char **argv)
                     : "b" (trdos_fd), "c" (data_ptr), "d" (data_size)
                     : "eax"
                 );
-            }
+            } 
 
-            // ADIM D: Dosyayı güvenle kapat (sys_close = 6)
+            // ADIM C: Dosyayı güvenle kapat (sys_close = 6)
             __asm__ __volatile__ (
                 ".intel_syntax noprefix\n"
                 "mov eax, 6\n"          /* sys_close */
@@ -10032,7 +10080,7 @@ int main(int argc, char **argv)
             printf("-> [SUCCESS]: 'test.prg' generated flawlessly via Native Assembly Writer!\n");
             printf("-> [TRDOS SHIELD]: Process finished successfully. Forced exit to prompt.\n");
             
-            // ADIM E: Orijinal kırık yazma katmanlarına düşmemek için zorunlu çıkış (sys_exit = 1)
+            // ADIM D: Orijinal kırık yazma katmanlarına düşmemek için zorunlu çıkış (sys_exit = 1)
             __asm__ __volatile__ (
                 ".intel_syntax noprefix\n"
                 "mov ebx, 0\n"          /* Başarı kodu: 0 */
@@ -10046,7 +10094,6 @@ int main(int argc, char **argv)
     } else {
         printf("-> [TRDOS PRG ENGINE WARN]: text_section is empty!\n");
     }
-    /* ========================================================================= */
 
     /* 5/7/2026 */
     // if (s->output_type != TCC_OUTPUT_MEMORY) {
