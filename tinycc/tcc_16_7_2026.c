@@ -777,14 +777,9 @@ static char *tcc_strdup(const char *str)
     return ptr;
 }
 
-// #define free(p) use_tcc_free(p)
-// #define malloc(s) use_tcc_malloc(s)
-// #define realloc(p, s) use_tcc_realloc(p, s)
-
-/* 17/07/2026 */
-#define free(p) tcc_free(p)
-#define malloc(s) tcc_malloc(s)
-#define realloc(p, s) tcc_realloc(p, s)
+#define free(p) use_tcc_free(p)
+#define malloc(s) use_tcc_malloc(s)
+#define realloc(p, s) use_tcc_realloc(p, s)
 
 /* Dynamic sequence manager expanding target array structures at power-of-two operational thresholds */
 static void dynarray_add(void ***ptab, int *nb_ptr, void *data)
@@ -8120,13 +8115,7 @@ int tcc_relocate(TCCState *s1)
 
     s1->nb_errors = 0;
     
-    /* 17/07/2026 - Google AI */
-    // tcc_add_runtime(s1);
-    /* 
-       Burada crt0.o ve main.c derlendi, tüm sembol açıkları olgunlaştı.
-       Şimdi libc.a'yı tam bu satırda cımbızla taratıp eksikleri kapatıyoruz!
-    */
-    tcc_link_libc_flat(s1);
+    tcc_add_runtime(s1);
 
     relocate_common_syms();
 
@@ -8380,12 +8369,8 @@ static int tcc_add_file_internal(TCCState *s1, const char *filename, int flags)
         } else {
             ret = tcc_load_ldscript(s1);
             if (ret < 0) {
-                // error_noabort("unrecognized file type");
-		/* 17/07/2026 - Google AI - DEBUG */
-		/* CRITICAL DEBUG: Print the exact file name causing the type mismatch! */
-                error_noabort("unrecognized file type for target: '%s'", filename);
-                
-		goto fail;
+                error_noabort("unrecognized file type");
+                goto fail;
             }
         }
     }
@@ -8452,10 +8437,7 @@ int tcc_set_output_type(TCCState *s, int output_type)
         tcc_add_sysinclude_path(s, buf);
     }
 
-    /* 17/07/2026 - Google AI */
-    // tcc_add_runtime(s);
-    /* crt0.o dosyasını tam burada koda İLK eleman olarak ekletiyoruz! */
-    tcc_add_crt0_flat(s);
+    tcc_add_runtime(s);
     return 0;
 }
 

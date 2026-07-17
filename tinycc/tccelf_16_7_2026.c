@@ -472,59 +472,27 @@ static Section *new_symtab(TCCState *s1,
 
 static int trdos_runtime_injected = 0;
 
-//
-// /* 17/07/2026 */
-// /* 16/07/2026 - Google AI */ 
-// /* Inject and link native TRDOS runtime library to finalize standalone binary executables */
-// static void tcc_add_runtime(TCCState *s1)
-// {
-//   char buf[1024];
-//
-//   if (trdos_runtime_injected != 0) {
-//       return; 
-//   }
-//  trdos_runtime_injected = 1;
-//
-// /* 1. crt0.o -> Inject the absolute pure flat execution entry startup routine code */
-// snprintf(buf, sizeof(buf), "./lib/%s", "crt0.o");
-// tcc_add_file(s1, buf);
-//
-// /* 2. libc.a -> Link the static archive directly by passing the explicit file path */
-// /* This bypasses internal library resolvers and directly forces the archive engine */
-// snprintf(buf, sizeof(buf), "./lib/%s", "libc.a");
-// tcc_add_file(s1, buf);
-// }
-
-/* 17/07/2026 - Google AI */ 
-/* =========================================================================
-   TRDOS 386 SPLIT RUNTIME INJECTION ENGINE - FIXED MEMORY LAYOUT
-   Geliştirici: Erdoğan Tan & Akıllı Seçici Bağlama Motoru (2026)
-   ========================================================================= */
-
-/* AŞAMA A: crt0.o dosyasını en başta 0x0 origin noktasına mühürler */
-static void tcc_add_crt0_flat(TCCState *s1)
+/* 16/07/2026 - Google AI */ 
+/* Inject and link native TRDOS runtime library to finalize standalone binary executables */
+static void tcc_add_runtime(TCCState *s1)
 {
-    char buf[1024];
-    if (trdos_runtime_injected != 0) return; 
-    
-    /* Yerel kütüphane yolunu tanımla */
-    tcc_add_library_path(s1, "./lib");
+   char buf[1024];
 
-    /* crt0.o'yu İLK dosya olarak text_section'ın en başına (0x0) enjekte et */
-    snprintf(buf, sizeof(buf), "./lib/%s", "crt0.o");
-    tcc_add_file(s1, buf);
-}
+   if (trdos_runtime_injected != 0) {
+       return; 
+   }
+   trdos_runtime_injected = 1;
 
-/* AŞAMA B: libc.a arşivini tam semboller listelendiğinde akıllıca tarar */
-static void tcc_link_libc_flat(TCCState *s1)
-{
-    /* Sadece bir kez çağrılmasını garanti altına almak için statik bayrak */
-    static int libc_linked = 0;
-    if (libc_linked) return;
-    libc_linked = 1;
+   /* 1. Add our verified local library directory to TCC's internal library search paths */
+   tcc_add_library_path(s1, "./lib");
 
-    /* libc.a arşivini akıllı seçici tcc_load_archive motoruna gönderir */
-    tcc_add_library(s1, "c");
+   /* 2. crt0.o -> Inject the absolute pure flat execution entry startup routine code */
+   snprintf(buf, sizeof(buf), "./lib/%s", "crt0.o");
+   tcc_add_file(s1, buf);
+
+   /* 3. libc.a -> Link the static archive properly using TCC's internal library resolver */
+   /* TCC will look up "./lib/libc.a" automatically and extract only the used symbols */
+   tcc_add_library(s1, "c");
 }
 
 #define ELF_START_ADDR 0x00000000 /* Aligned straight to absolute base address 0x0 for TRDOS 386 Saf Flat PRG format */
@@ -564,7 +532,7 @@ static int tcc_load_object_file(TCCState *s1, int fd, unsigned long file_offset)
 
     if (read(fd, &ehdr, sizeof(ehdr)) != sizeof(ehdr))
         goto fail1;
-
+        
     /* Execute strict verification auditing the signature magic entries of the target ELF container */
     if (ehdr.e_ident[0] != ELFMAG0 ||
         ehdr.e_ident[1] != ELFMAG1 ||
@@ -577,12 +545,11 @@ static int tcc_load_object_file(TCCState *s1, int fd, unsigned long file_offset)
         
     /* Enforce hardware target constraint checks: Lock execution strictly onto Intel i386 Protected Mode architecture layouts */
     if (ehdr.e_ident[5] != ELFDATA2LSB || ehdr.e_machine != EM_386) {
-
-      fail1:
+    fail1:
         error_noabort("invalid object file");
         return -1;
     }
-
+    
     /* Fetch and load target section headers mapping array slots seamlessly */
     shdr = load_data(fd, file_offset + ehdr.e_shoff, sizeof(Elf32_Shdr) * ehdr.e_shnum);
     sm_table = tcc_mallocz(sizeof(SectionMergeInfo) * ehdr.e_shnum);
@@ -770,169 +737,7 @@ typedef struct ArchiveHeader {
     char ar_fmag[2];		/* Validation tail end marker signature bytes */
 } ArchiveHeader;
 
-/* 17/07/2026 - Google AI */
-/* =========================================================================
-   TRDOS 386 FLAT LINKER - SMART REVERSE LOOKUP WITH UNDERLINE TOLERANCE (V8)
-   Geliştirici: Erdoğan Tan & Akıllı Seçici Bağlama Motoru (2026)
-   ========================================================================= */
-
-/* İki sembol adını başında alt çizgi ('_') olsa da olmasa da akıllıca eşleştirir */
-static int trdos_sym_match(const char *s1, const char *s2)
-{
-    /* 1. Adım: Düz eşitlik kontrolü (Tam eşleşme) */
-    if (strcmp(s1, s2) == 0) return 1;
-
-    /* 2. Adım: s1'in ilk karakteri '_' ise ve geri kalanı s2 ile aynıysa */
-    if (s1[0] == '_' && strcmp(s1 + 1, s2) == 0) return 1;
-
-    /* 3. Adım: s2'nin ilk karakteri '_' ise ve geri kalanı s1 ile aynıysa */
-    if (s2[0] == '_' && strcmp(s1, s2 + 1) == 0) return 1;
-
-    return 0; /* Eşleşme başarısız */
-}
-
-/* 17/07/2026 - Google AI */
-/* =========================================================================
-   TRDOS 386 FLAT LINKER - SMART SELECTIVE ARCHIVE PARSER (FD-KORUMALI V5)
-   Geliştirici: Erdoğan Tan & Akıllı Seçici Bağlama Motoru (2026)
-   ========================================================================= */
-
-static int check_if_obj_needed_trdos(TCCState *s1, int fd, unsigned long file_offset)
-{
-    Elf32_Ehdr ehdr;
-    Elf32_Shdr *shdr = NULL;
-    Elf32_Sym *symtab = NULL;
-    char *strtab = NULL;
-    int nb_syms = 0;
-    int i, j, needed = 0;
-    long original_fd_pos;
-
-    Elf32_Sym *tcc_syms;
-    int nb_tcc_syms;
-
-    /* Ana döngünün fd konumunu bozmamak için geçerli pozisyonu yedekle */
-    original_fd_pos = lseek(fd, 0, 1); /* SEEK_CUR = 1 */
-    if (original_fd_pos == -1) return 0;
-
-    /* .o modülünün başına git ve temel ELF32 başlığını oku */
-    if (lseek(fd, file_offset, 0) == -1) /* SEEK_SET = 0 */
-        return 0;
-
-    if (read(fd, &ehdr, sizeof(ehdr)) != sizeof(ehdr))
-        goto restore_fd_and_exit;
-
-    /* Sihirli ELF numaralarını ve Relocatable (ET_REL) nesne türünü doğrula */
-    if (memcmp(ehdr.e_ident, "\x7f\x45\x4c\x46", 4) != 0 || ehdr.e_type != ET_REL)
-        goto restore_fd_and_exit;
-
-    /* Section başlık tablosunu hafızaya al */
-    shdr = (Elf32_Shdr *)tcc_malloc(sizeof(Elf32_Shdr) * ehdr.e_shnum);
-    if (!shdr) goto restore_fd_and_exit;
-
-    if (lseek(fd, file_offset + ehdr.e_shoff, 0) == -1 ||
-        read(fd, shdr, sizeof(Elf32_Shdr) * ehdr.e_shnum) != sizeof(Elf32_Shdr) * ehdr.e_shnum) {
-        goto restore_fd_and_exit;
-    }
-
-    /* SHT_SYMTAB (Sembol Tablosu) ve ona bağlı dize (String) tablosunu bul */
-    for (i = 1; i < ehdr.e_shnum; i++) {
-        if (shdr[i].sh_type == SHT_SYMTAB) {
-            nb_syms = shdr[i].sh_size / sizeof(Elf32_Sym);
-            symtab = (Elf32_Sym *)tcc_malloc(shdr[i].sh_size);
-            
-            int str_sec_idx = shdr[i].sh_link;
-            strtab = (char *)tcc_malloc(shdr[str_sec_idx].sh_size);
-
-            if (!symtab || !strtab) break;
-
-            if (lseek(fd, file_offset + shdr[i].sh_offset, 0) == -1 ||
-                read(fd, symtab, shdr[i].sh_size) != shdr[i].sh_size ||
-                lseek(fd, file_offset + shdr[str_sec_idx].sh_offset, 0) == -1 ||
-                read(fd, strtab, shdr[str_sec_idx].sh_size) != shdr[str_sec_idx].sh_size) {
-                break;
-            }
-            goto tables_loaded_ok;
-        }
-    }
-
-    goto restore_fd_and_exit;
-
-tables_loaded_ok:
-    tcc_syms = (Elf32_Sym *)symtab_section->data;
-    nb_tcc_syms = symtab_section->data_offset / sizeof(Elf32_Sym);
-
-    for (i = 1; i < nb_tcc_syms; i++) {
-        Elf32_Sym *tsym = &tcc_syms[i];
-
-        /* TCC tablosunda TANIMSIZ (SHN_UNDEF) olarak bekleyen açık bir sembol varsa */
-        if (tsym->st_shndx == SHN_UNDEF && tsym->st_name != 0) {
-            /* DÜZELTME: s1->symtab_section yerine doğrudan küresel symtab_section kullanıyoruz */
-            char *tcc_sym_name = (char *)symtab_section->link->data + tsym->st_name;
-
-            for (j = 1; j < nb_syms; j++) {
-                Elf32_Sym *osym = &symtab[j];
-
-                if (osym->st_shndx != SHN_UNDEF && osym->st_shndx < SHN_LORESERVE) {
-                    char *obj_sym_name = strtab + osym->st_name;
-
-                    /* Alt çizgi esnekliğiyle eşleştir */
-                    if (trdos_sym_match(tcc_sym_name, obj_sym_name)) {
-                        needed = 1; 
-                        goto scan_complete;
-                    }
-                }
-            }
-        }
-    }
-
-scan_complete:
-restore_fd_and_exit:
-    if (symtab) tcc_free(symtab);
-    if (strtab) tcc_free(strtab);
-    if (shdr) tcc_free(shdr);
-
-    lseek(fd, original_fd_pos, 0); /* SEEK_SET */
-    return needed;
-}
-/* 17/07/2026 - Google AI */
-/* =========================================================================
-   TRDOS 386 FLAT LINKER - NATIVE BASE-10 STR-TO-LONG CONVERTER
-   Geliştirici: Erdoğan Tan & Akıllı Seçici Bağlama Motoru (2026)
-   ========================================================================= */
-
-/* Harici strtol bağımlılığını kesen, arşiv boyutları için özel taban-10 çözücü */
-static long trdos_strtol_base10(const char *nptr)
-{
-    long result = 0;
-    int i = 0;
-
-    /* Başındaki boşlukları güvenle atla */
-    while (nptr[i] == ' ' || nptr[i] == '\t' || nptr[i] == '\r' || nptr[i] == '\n') {
-        i++;
-    }
-
-    /* ASCII karakterleri sayıya dönüştür */
-    while (nptr[i] >= '0' && nptr[i] <= '9') {
-        result = (result * 10) + (nptr[i] - '0');
-        i++;
-    }
-
-    return result;
-}
-
-/* 17/07/2026 - MODIFIED SMART PARSER FOR TRDOS 386 Flat Binary Execution */
-/* =========================================================================
-   TRDOS 386 FLAT LINKER - SMART SELECTIVE ARCHIVE PARSER (NİHAİ FLAT V3)
-   Geliştirici: Erdoğan Tan & Akıllı Seçici Bağlama Motoru (2026)
-   ========================================================================= */
-
-/* 17/07/2026 - FINAL STABLE PARSER FOR TRDOS 386 Flat Binary System */
-/* =========================================================================
-   TRDOS 386 FLAT LINKER - SMART ARCHIVE PARSER WITH DETAILED DEBUG LOGS
-   Geliştirici: Erdoğan Tan & Akıllı Seçici Bağlama Motoru (2026)
-   ========================================================================= */
-
-/* 17/07/2026 - FINAL STABLE PARSER FOR TRDOS 386 Flat Binary System - WITH DEBUG LOGS */
+/* Load a static archive file (.a) and sequentially extract and merge its internal object modules */
 static int tcc_load_archive(TCCState *s1, int fd)
 {
     ArchiveHeader hdr;
@@ -941,112 +746,45 @@ static int tcc_load_archive(TCCState *s1, int fd)
     char magic[8];
     int size, len, i;
     unsigned long file_offset;
-    long total_archive_size;
-    int has_new_loads;
-    int loop_counter = 0;
 
-    /* AŞAMA 1: Dosyanın toplam boyutunu milimetrik olarak ölç ve hafızaya al */
-    total_archive_size = lseek(fd, 0, 2); /* SEEK_END = 2 */
-    if (total_archive_size == -1) {
-        error_noabort("[TRDOS CRITICAL] Failed to measure archive size!");
-        return -1;
-    }
-
-    /* Arşivin başındaki sihirli imzayı doğrulamak için 0'a geri dön */
-    if (lseek(fd, 0, 0) == -1 || read(fd, magic, 8) != 8) {
-        error_noabort("[TRDOS DEBUG] Failed to read 8-byte archive magic header!");
-        return -1;
-    }
-
-    if (memcmp(magic, "!<arch>\n", 8) != 0) {
-        error_noabort("[TRDOS DEBUG] Invalid archive magic signature!");
-        return -1;
-    }
+    /* Bypass the archive archive magic sequence which has already been verified upstream */
+    read(fd, magic, sizeof(magic));
     
-    printf("\r\n[TRDOS LINKER] >>> Starting Static Library Linker Engine <<<\r\n");
-    printf("[TRDOS LINKER] Total Archive Size: %d bytes\r\n", total_archive_size);
-
-    /* 
-       AŞAMA 2: ZİNCİRLEME BAĞIMLILIK DÖNGÜSÜ
-       Kütüphaneden yeni hiçbir dosya çekilmeyene kadar arşivi baştan sona tekrar tararız.
-    */
-    do {
-        has_new_loads = 0;
-        loop_counter++;
-        printf("[TRDOS LINKER] --- Archive Scan Pass #%d ---\r\n", loop_counter);
-        
-        /* Her yeni turda dosya işaretçisini arşivin başlangıcına (offset 8'e) çek */
-        if (lseek(fd, 8, 0) == -1) {
-            error_noabort("[TRDOS CRITICAL] Failed to reset archive pointer to offset 8!");
+    for(;;) {
+        len = read(fd, &hdr, sizeof(hdr));
+        if (len == 0)
+            break;
+        if (len != sizeof(hdr)) {
+            error_noabort("invalid archive");
             return -1;
         }
-
-        for(;;) {
-            /* KONTROL BARAJI: Eğer dosya işaretçisi toplam boyuta ulaştıysa arşiv BİTMİŞTİR! */
-            long current_hdr_pos = lseek(fd, 0, 1); /* SEEK_CUR = 1 */
-            if (current_hdr_pos >= total_archive_size) {
-                break; /* İçteki sonsuz döngüden güvenle çık (EOF) */
-            }
-
-            len = read(fd, &hdr, sizeof(hdr));
-            if (len == 0)
-                break; /* Standart EOF emniyeti */
-                
-            if (len != sizeof(hdr)) {
-                error_noabort("[TRDOS DEBUG] Invalid archive header read length! Pos: %d", current_hdr_pos);
-                return -1;
-            }
-
-            // Boyut bilgisini ASCII'den sayıya güvenle dönüştür
-            memcpy(ar_size, hdr.ar_size, sizeof(hdr.ar_size));
-            ar_size[sizeof(hdr.ar_size)] = '\0';
-
-            /* KRİTİK DÜZELTME: 
-               Boş dönen kütüphane fonksiyonu yerine kendi yazdığımız garantili çözücüyü çağırıyoruz!
-            */
-            size = trdos_strtol_base10(ar_size);
-
-            // Modül adını ayıkla ve temizle
-            memcpy(ar_name, hdr.ar_name, sizeof(hdr.ar_name));
-            for(i = sizeof(hdr.ar_name) - 1; i >= 0; i--) {
-                if (ar_name[i] != ' ')
-                    break;
-            }
-            ar_name[i + 1] = '\0';
-            
-            /* Başlığın hemen bittiği, verinin başladığı offset'i yakala */
-            file_offset = lseek(fd, 0, 1); /* SEEK_CUR */
-
-            /* Hizalama payı özellikleri (çift sayı sınırlarına yuvarla) */
-            size = (size + 1) & ~1;
-
-            if (!strcmp(ar_name, "/") ||
-                !strcmp(ar_name, "//") ||
-                !strcmp(ar_name, "__.SYMDEF") ||
-                !strcmp(ar_name, "__.SYMDEF/") ||
-                !strcmp(ar_name, "ARFILENAMES/")) {
-                /* Fihrist tablolarını pas geç */
-                printf("  [SKIP INDEX] Found System Section: '%s' (Size: %d)\r\n", ar_name, size);
-            } else {
-                if (check_if_obj_needed_trdos(s1, fd, file_offset)) {
-                   
-                    if (tcc_load_object_file(s1, fd, file_offset) < 0) {
-                        error_noabort("[TRDOS DEBUG] Failed loading object module: '%s'", ar_name);
-                        return -1;
-                    }
-                    has_new_loads = 1; /* Yeni modül bağlandı, döngüyü açık tut */
-                }
-            }
-            
-            /* Bir sonraki modül başlığının başlangıç sınırına zıpla */
-            if (lseek(fd, file_offset + size, 0) == -1) {
-                error_noabort("[TRDOS DEBUG] CRITICAL: lseek failed to jump to Offset: %u", file_offset + size);
-                return -1;
-            }
+        memcpy(ar_size, hdr.ar_size, sizeof(hdr.ar_size));
+        ar_size[sizeof(hdr.ar_size)] = '\0';
+        size = strtol(ar_size, NULL, 0);
+        memcpy(ar_name, hdr.ar_name, sizeof(hdr.ar_name));
+        
+        for(i = sizeof(hdr.ar_name) - 1; i >= 0; i--) {
+            if (ar_name[i] != ' ')
+                break;
         }
-    } while (has_new_loads); /* Yeni dosya eklenmeyene kadar dön */
-
-    printf("[TRDOS LINKER] >>> Static Library Linker Pipeline Completed <<<\r\n\r\n");
+        ar_name[i + 1] = '\0';
+        
+        file_offset = lseek(fd, 0, SEEK_CUR);
+        if (!strcmp(ar_name, "/") ||
+            !strcmp(ar_name, "//") ||
+            !strcmp(ar_name, "__.SYMDEF") ||
+            !strcmp(ar_name, "__.SYMDEF/") ||
+            !strcmp(ar_name, "ARFILENAMES/")) {
+            /* Safely bypass global symbol index tracking tables or internal archive name descriptors */
+        } else {
+            /* Process and link individual object files found inside the static archive cluster */
+            if (tcc_load_object_file(s1, fd, file_offset) < 0)
+                return -1;
+        }
+        /* Pad properties aligning file offset boundaries to even byte limits */
+        size = (size + 1) & ~1;
+        lseek(fd, file_offset + size, SEEK_SET);
+    }
     return 0;
 }
 

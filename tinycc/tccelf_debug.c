@@ -875,6 +875,12 @@ tables_loaded_ok:
                 if (osym->st_shndx != SHN_UNDEF && osym->st_shndx < SHN_LORESERVE) {
                     char *obj_sym_name = strtab + osym->st_name;
 
+                    /* 
+                       DİNAMİK SEMBOL DEBUG LOGU:
+                       TCC'nin o an kıyasladığı isim çiftlerini ekrana döker 
+                    */
+                    printf("      [COMPARE] TCC Wants: '%s' <-> .o Offers: '%s'\r\n", tcc_sym_name, obj_sym_name);
+
                     /* Alt çizgi esnekliğiyle eşleştir */
                     if (trdos_sym_match(tcc_sym_name, obj_sym_name)) {
                         needed = 1; 
@@ -1028,13 +1034,23 @@ static int tcc_load_archive(TCCState *s1, int fd)
                 /* Fihrist tablolarını pas geç */
                 printf("  [SKIP INDEX] Found System Section: '%s' (Size: %d)\r\n", ar_name, size);
             } else {
+                /* 
+                   AKILLI SEÇİCİ FİLTRE:
+                   Eğer bu .o modülü projenin şu anki sembol açığını kapatıyorsa içeri al!
+                */
+                printf("  [EXAMINE] Object Module: '%s' at Offset: %u (Size: %d)... ", ar_name, (unsigned int)file_offset, size);
+                
                 if (check_if_obj_needed_trdos(s1, fd, file_offset)) {
-                   
+                    printf("[APPROVED]\r\n");
+                    printf("    -> [LOADING] Merging '%s' into target text_section...\r\n", ar_name);
+                    
                     if (tcc_load_object_file(s1, fd, file_offset) < 0) {
                         error_noabort("[TRDOS DEBUG] Failed loading object module: '%s'", ar_name);
                         return -1;
                     }
                     has_new_loads = 1; /* Yeni modül bağlandı, döngüyü açık tut */
+                } else {
+                    printf("[REJECTED - Not Needed]\r\n");
                 }
             }
             
