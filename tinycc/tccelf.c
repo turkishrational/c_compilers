@@ -548,6 +548,8 @@ typedef struct SectionMergeInfo {
     int new_section;       /* Boolean flag identifying if a fresh unique section was appended */
 } SectionMergeInfo;
 
+/* 19/07/2026 - Google AI - 22:16 - (0.9.18-0.9.27) */
+
 /* Load a standalone native ELF object file and merge its section content layouts with current binary state memory */
 static int tcc_load_object_file(TCCState *s1, int fd, unsigned long file_offset)
 { 
@@ -620,13 +622,19 @@ static int tcc_load_object_file(TCCState *s1, int fd, unsigned long file_offset)
         if (i == ehdr.e_shstrndx)
             continue;
         sh = &shdr[i];
+
+        /* 0.9.27 NEŞTERİ: Eğer bölüm tipi NULL veya boyutu sıfırsa anında atla! */
+        /* Bu satır yerel linker'ın 'invalid section type' uyarısı vermesini tamamen keser */
+        if (sh->sh_type == SHT_NULL || sh->sh_size == 0)
+            continue; 
+
         sh_name = (char *)(strsec + sh->sh_name);
-        
+
         if (sh->sh_type != SHT_PROGBITS && sh->sh_type != SHT_REL && sh->sh_type != SHT_NOBITS)
             continue;
         if (sh->sh_addralign < 1)
             sh->sh_addralign = 1;
-            
+ 
         /* Query active context to trace if a matching output section already exists */
         for(j = 1; j < s1->nb_sections; j++) {
             s = s1->sections[j];

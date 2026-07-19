@@ -8814,219 +8814,217 @@ int main(int argc, char **argv)
     /* ELF nesne formatı için burası bir boş stub olarak çalışır, flat büyümede files güvenle korunur */
     tcc_free(files);
 
-    /* 19/07/2026 - Google AI */
+    /* 19/07/2026 - Google AI */		
     /* Resolve linear pointer references across newly initialized flat segments in RAM */
     /* LOKOMOTİF NEŞTERİ 1: -c modunda relocation kilitlenmesi atlanmalıdır! */
     if (output_type != TCC_OUTPUT_OBJ) {
-        tcc_relocate(s);
+        tcc_relocate(s); 
     }
 
-    /* 19/07/2026 - Google AI - 22:16 - (0.9.18-0.9.27) */
     /* =========================================================================
-       TRDOS 386 REFERANS TCC - OUTPUT WRITER PIPELINE (SEALED)
-       ========================================================================= */
-   /* =========================================================================
-       TRDOS 386 REFERANS TCC - OUTPUT WRITER PIPELINE (FIXED & SEALED)
+       TRDOS NATIVE TCC FLAT BINARY WRITER - ABSOLUTE KERNEL SEAL
        ========================================================================= */
     if (text_section && text_section->data_offset > 0) {
         unsigned char *text_ptr  = text_section->data;
         unsigned int   text_size = text_section->data_offset;
         int trdos_fd = -1;
-        int c_fd = -1; /* Lseek.s (sub ebx,3) uyumluluğu için kilit değişken */
+        // int c_fd = -1; /* Lseek ve C kütüphane fonksiyonları için korumalı çatal değişken */
 
         /* EXECUTE STEP A: Invoke TRDOS sys_create kernel vector interrupt (eax = 8) with dynamic outfile! */
         __asm__ __volatile__ (
             ".intel_syntax noprefix\n"
-            "mov ecx, 0\n"
-            "mov eax, 8\n"
-            "int 0x40\n"
+            "mov ecx, 0\n"              
+            "mov eax, 8\n"              
+            "int 0x40\n"                
             "jnc .L_final_create_ok\n"
-            "mov eax, -1\n"
+            "mov eax, -1\n"             
         ".L_final_create_ok:\n"
-            "mov %0, eax\n"
+            "mov %0, eax\n"             
             ".att_syntax\n"
-            : "=r" (trdos_fd)
-            : "b" (outfile)
+            : "=r" (trdos_fd)           
+            : "b" (outfile) 
             : "eax", "ecx"
         );
 
+        /* 19/07/2026 - Google AI */
+
         if (trdos_fd >= 0) {
-            /* 128-Byte / FD Çelişkisini Çözen Muazzam Klonlama */
-            c_fd = trdos_fd + 3; 
 
-            /* 20/07/2026 - Google AI - 0:28 */
+           /* Çekirdekten dönen ham dosya indeksini lseek.s uyumluluğu için 3 büyütüyoruz! */
+           int c_fd = trdos_fd + 3;
+
+           /* =========================================================================
+              TRDOS 386 NATIVE TCC - PURE SHT_REL RELOCATABLE ELF32 OBJECT WRITER
+              ========================================================================= */
             if (output_type == TCC_OUTPUT_OBJ) {
-                /* =========================================================================
-                   TRDOS 386 REFERANS TCC - 0.9.27 COMPLIANT ELF32 WRITER (596 BYTE FIX)
-                   ========================================================================= */
                 Elf32_Ehdr ehdr;
-                Elf32_Shdr master_shdr;
-                unsigned char shstrtab_payload[56]; // GCC UYUMU: Tam 56 Byte Genişliğinde Dizi
-                
-                unsigned int text_len = text_section->data_offset;
-                unsigned int data_len = data_section ? data_section->data_offset : 0;
-                unsigned int current_offset = 52;
-                int out_fd = trdos_fd;
+                Elf32_Shdr shdr;
+                Section *s1;
+                unsigned int file_offset;
+                int k;
 
-                /* TCC 0.9.18/0.9.27 dahili relocation verilerini doğrudan .text yatağından çekiyoruz */
-                Section *actual_reloc_sec = text_section->reloc;
-                unsigned int reloc_data_size = actual_reloc_sec ? actual_reloc_sec->data_offset : 0;
+                /* TCC 0.9.18 standardına göre hataları sıfırla */
+                s->nb_errors = 0;
 
-                memset(shstrtab_payload, 0, sizeof(shstrtab_payload));
-                memset(&master_shdr, 0, sizeof(Elf32_Shdr));
+                /* 1. DOSYA KONUMUNU AYARLA: ELF Ana Başlığı (52 Byte) sonrasından başla */
+                file_offset = sizeof(Elf32_Ehdr);
 
-                /* 1. LOKOMOTİF TAMİRİ: Orijinal TCC 0.9.27 İsim Havuzunun Harfi Harfine Enjeksiyonu */
-                // Dizilim: "\0.text\0.data\0.bss\0.symtab\0.strtab\0.rel.text\0.shstrtab\0"
-                memcpy(shstrtab_payload + 0,  "\0", 1);
-                memcpy(shstrtab_payload + 1,  ".text\0", 6);
-                memcpy(shstrtab_payload + 7,  ".data\0", 6);
-                memcpy(shstrtab_payload + 13, ".bss\0", 5);
-                memcpy(shstrtab_payload + 18, ".symtab\0", 8);
-                memcpy(shstrtab_payload + 26, ".strtab\0", 8);
-                memcpy(shstrtab_payload + 34, ".rel.text\0", 10); // .rel.text yerini buldu!
-                memcpy(shstrtab_payload + 44, ".shstrtab\0", 10); // .shstrtab tablonun kendisi eklendi!
-                unsigned int shstrtab_bytes = 54;
-
-                /* 2. Kesin Ofset Koordinat Hesaplamaları */
-                unsigned int text_off = current_offset;     current_offset += text_len;
-                unsigned int data_off = current_offset;     current_offset += data_len;
-                unsigned int symtab_off = current_offset;   current_offset += (symtab_section ? symtab_section->data_offset : 0);
-                unsigned int strtab_off = current_offset;   current_offset += (strtab_section ? strtab_section->data_offset : 0);
-                unsigned int rel_off = current_offset;      current_offset += reloc_data_size;
-                unsigned int shstrtab_off = current_offset; current_offset += shstrtab_bytes;
-                unsigned int shdr_table_off = current_offset;
-
-                /* 3. Ana ELF Başlığını 8 Bölümlü Standarda Göre Düzenle */
-                memset(&ehdr, 0, sizeof(Elf32_Ehdr));
-                memcpy(ehdr.e_ident, "\x7f\x45\x4c\x46\x01\x01\x01\x00", 8);
-                *(unsigned short *)(ehdr.e_ident + 16) = 1;  // ET_REL
-                *(unsigned short *)(ehdr.e_ident + 18) = 3;  // EM_386
-                *(unsigned int   *)(ehdr.e_ident + 20) = 1;  
-                *(unsigned int   *)(ehdr.e_ident + 32) = shdr_table_off; // Tablo başlangıcı
-                *(unsigned short *)(ehdr.e_ident + 40) = 52; 
-                *(unsigned short *)(ehdr.e_ident + 46) = 40; 
-                *(unsigned short *)(ehdr.e_ident + 48) = 8;  // 0.9.27 Standardı: Tam 8 Bölüm Var!
-                *(unsigned short *)(ehdr.e_ident + 50) = 7;  // Bölüm isimleri Index 7'de! (.shstrtab)
-
-                /* 4. DISKE BLOK HALİNDE YAZMA AKIŞI */
-                __asm__ __volatile__ (".intel_syntax noprefix\n mov eax, 4\n int 0x40\n .att_syntax\n" :: "b"(out_fd), "c"(&ehdr), "d"(52) : "eax");
-                __asm__ __volatile__ (".intel_syntax noprefix\n mov eax, 4\n int 0x40\n .att_syntax\n" :: "b"(out_fd), "c"(text_section->data), "d"(text_len) : "eax");
-                if (data_len > 0) __asm__ __volatile__ (".intel_syntax noprefix\n mov eax, 4\n int 0x40\n .att_syntax\n" :: "b"(out_fd), "c"(data_section->data), "d"(data_len) : "eax");
-                
-                lseek(c_fd, symtab_off, SEEK_SET); 
-                if (symtab_section) __asm__ __volatile__ (".intel_syntax noprefix\n mov eax, 4\n int 0x40\n .att_syntax\n" :: "b"(out_fd), "c"(symtab_section->data), "d"(symtab_section->data_offset) : "eax");
-                if (strtab_section) __asm__ __volatile__ (".intel_syntax noprefix\n mov eax, 4\n int 0x40\n .att_syntax\n" :: "b"(out_fd), "c"(strtab_section->data), "d"(strtab_section->data_offset) : "eax");
-                if (actual_reloc_sec && reloc_data_size > 0) {
-                    __asm__ __volatile__ (".intel_syntax noprefix\n mov eax, 4\n int 0x40\n .att_syntax\n" :: "b"(out_fd), "c"(actual_reloc_sec->data), "d"(reloc_data_size) : "eax");
+                /* 2. TÜM GERÇEK TCC SEGMENTLERİNİN PAYLOAD VERİLERİNİ ARDI ARDINA DİSKE BAS */
+                for (k = 1; k < s->nb_sections; k++) {
+                    s1 = s->sections[k];
+                    
+                    /* Orijinal TCC kuralı: SHT_NOBITS (.bss) hariç verisi olan her şeyi diske yaz */
+                    if (s1->data_offset > 0 && s1->sh_type != SHT_NOBITS) {
+                        s1->sh_offset = file_offset;
+                        
+                        // Okuma/Yazma kafasını TRDOS diskinde ilgili sektöre konumlandır
+                        lseek(c_fd, file_offset, SEEK_SET);
+                        
+                        // TCC'nin hafızada ürettiği saf makine kodunu, veriyi veya relocation tablosunu yaz
+                        __asm__ __volatile__ (
+                            ".intel_syntax noprefix\n"
+                            "mov eax, 4\n"
+                            "int 0x40\n"
+                            ".att_syntax\n"
+                            :: "b" (trdos_fd), "c" (s1->data), "d" (s1->data_offset) : "eax"
+                        );
+                        file_offset += s1->data_offset;
+                    } else {
+                        s1->sh_offset = 0;
+                    }
                 }
-                
-                lseek(c_fd, shstrtab_off, SEEK_SET);
-                __asm__ __volatile__ (".intel_syntax noprefix\n mov eax, 4\n int 0x40\n .att_syntax\n" :: "b"(out_fd), "c"(shstrtab_payload), "d"(shstrtab_bytes) : "eax");
-                
-                /* =========================================================================
-                   5. GÜVENLİ 0.9.27 SECTION HEADER ENJEKSİYONU (8 KARTLI TAM ŞEMA)
-                   ========================================================================= */
-                lseek(c_fd, shdr_table_off, SEEK_SET);
 
-                // KART 0: SHT_NULL
-                memset(&master_shdr, 0, sizeof(Elf32_Shdr));
-                __asm__ __volatile__ (".intel_syntax noprefix\n mov eax, 4\n int 0x40\n .att_syntax\n" :: "b"(out_fd), "c"(&master_shdr), "d"(40) : "eax");
+                /* 3. SECTION HEADER TABLE (Şema Tablosu) BAŞLANGICINI AYARLA */
+                ehdr.e_shoff = file_offset;
+                lseek(c_fd, file_offset, SEEK_SET);
 
-                // KART 1: .text
-                memset(&master_shdr, 0, sizeof(Elf32_Shdr));
-                master_shdr.sh_name = 1;  master_shdr.sh_type = 1; master_shdr.sh_flags = 6;
-                master_shdr.sh_addr = 0;  master_shdr.sh_offset = text_off; master_shdr.sh_size = text_len; master_shdr.sh_addralign = 4;
-                __asm__ __volatile__ (".intel_syntax noprefix\n mov eax, 4\n int 0x40\n .att_syntax\n" :: "b"(out_fd), "c"(&master_shdr), "d"(40) : "eax");
-
-                // KART 2: .data
-                memset(&master_shdr, 0, sizeof(Elf32_Shdr));
-                master_shdr.sh_name = 7;  master_shdr.sh_type = 1; master_shdr.sh_flags = 3;
-                master_shdr.sh_addr = 0;  master_shdr.sh_offset = data_off; master_shdr.sh_size = data_len; master_shdr.sh_addralign = 4;
-                __asm__ __volatile__ (".intel_syntax noprefix\n mov eax, 4\n int 0x40\n .att_syntax\n" :: "b"(out_fd), "c"(&master_shdr), "d"(40) : "eax");
-
-                // KART 3: .bss
-                memset(&master_shdr, 0, sizeof(Elf32_Shdr));
-                master_shdr.sh_name = 13; master_shdr.sh_type = 8; master_shdr.sh_flags = 3;
-                master_shdr.sh_addr = 0;  master_shdr.sh_offset = symtab_off; master_shdr.sh_size = bss_section ? bss_section->data_offset : 0; master_shdr.sh_addralign = 4;
-                __asm__ __volatile__ (".intel_syntax noprefix\n mov eax, 4\n int 0x40\n .att_syntax\n" :: "b"(out_fd), "c"(&master_shdr), "d"(40) : "eax");
-
-                // KART 4: .symtab
-                memset(&master_shdr, 0, sizeof(Elf32_Shdr));
-                master_shdr.sh_name = 18; master_shdr.sh_type = 2;
-                master_shdr.sh_addr = 0;  master_shdr.sh_offset = symtab_off; master_shdr.sh_size = symtab_section ? symtab_section->data_offset : 0;
-                master_shdr.sh_link = 5;  master_shdr.sh_info = 3; master_shdr.sh_entsize = sizeof(Elf32_Sym); master_shdr.sh_addralign = 4;
-                __asm__ __volatile__ (".intel_syntax noprefix\n mov eax, 4\n int 0x40\n .att_syntax\n" :: "b"(out_fd), "c"(&master_shdr), "d"(40) : "eax");
-
-                // KART 5: .strtab
-                memset(&master_shdr, 0, sizeof(Elf32_Shdr));
-                master_shdr.sh_name = 26; master_shdr.sh_type = 3;
-                master_shdr.sh_addr = 0;  master_shdr.sh_offset = strtab_off; master_shdr.sh_size = strtab_section ? strtab_section->data_offset : 0; master_shdr.sh_addralign = 1;
-                __asm__ __volatile__ (".intel_syntax noprefix\n mov eax, 4\n int 0x40\n .att_syntax\n" :: "b"(out_fd), "c"(&master_shdr), "d"(40) : "eax");
-
-                // KART 6: .rel.text (Yer Değiştirme Başlık Kartı)
-                memset(&master_shdr, 0, sizeof(Elf32_Shdr));
-                master_shdr.sh_name = 34; master_shdr.sh_type = 9; // SHT_REL
-                master_shdr.sh_addr = 0;  master_shdr.sh_offset = rel_off; master_shdr.sh_size = reloc_data_size;
-                master_shdr.sh_link = 4;  master_shdr.sh_info = 1; master_shdr.sh_entsize = 8; master_shdr.sh_addralign = 4;
-                __asm__ __volatile__ (".intel_syntax noprefix\n mov eax, 4\n int 0x40\n .att_syntax\n" :: "b"(out_fd), "c"(&master_shdr), "d"(40) : "eax");
-
-                // KART 7: .shstrtab (Bölüm İsim Havuzu Kartı - İndeks 7!)
-                memset(&master_shdr, 0, sizeof(Elf32_Shdr));
-                master_shdr.sh_name = 44; master_shdr.sh_type = 3; // SHT_STRTAB
-                master_shdr.sh_addr = 0;  master_shdr.sh_offset = shstrtab_off; master_shdr.sh_size = shstrtab_bytes; master_shdr.sh_addralign = 1;
-                __asm__ __volatile__ (".intel_syntax noprefix\n mov eax, 4\n int 0x40\n .att_syntax\n" :: "b"(out_fd), "c"(&master_shdr), "d"(40) : "eax");
-            }
-            else {
-                /* =========================================================================
-                   ORİJİNAL TRDOS FLAT BINARY (.PRG) MOTORUNUZ (SAAT 21.18 REFERANSI)
-                   ========================================================================= */
+                /* ADIM 1: ELF STANDARDI GEREĞİ INDEX 0'I SAF SIFIR (SHT_NULL) OLARAK BAS */
+                memset(&shdr, 0, sizeof(Elf32_Shdr));
                 __asm__ __volatile__ (
                     ".intel_syntax noprefix\n"
-                    "mov eax, 4\n" 
+                    "mov eax, 4\n"
                     "int 0x40\n"
                     ".att_syntax\n"
-                    :
-                    : "b" (trdos_fd), "c" (text_ptr), "d" (text_size)
-                    : "eax"
+                    :: "b" (trdos_fd), "c" (&shdr), "d" (sizeof(Elf32_Shdr)) : "eax"
                 );
 
-                if (data_section && data_section->data_offset > 0) {
-                    unsigned char *data_ptr = data_section->data;
-                    unsigned int data_size = data_section->data_offset;
+                /* ADIM 2: GERÇEK BÖLÜMLERİ İNDEKS 1'DEN BAŞLATARAK DİSKE BAS */
 
-                    __asm__ __volatile__ (
-                        ".intel_syntax noprefix\n"
-                        "mov eax, 4\n"
-                        "int 0x40\n"
-                        ".att_syntax\n"
-                        :
-                        : "b" (trdos_fd), "c" (data_ptr), "d" (data_size)
-                        : "eax"
-                    );
-                } 
+                /* 4. HER BİR BÖLÜMÜN BAŞLIK KARTINI (40 Byte) SIRAYLA DİSKE BAS */
+                for (k = 1; k < s->nb_sections; k++) {
+                    s1 = s->sections[k];
+                    memset(&shdr, 0, sizeof(Elf32_Shdr)); // Her döngüde temizle
+                    
+                    if (s1) {
+                        shdr.sh_name = s1->sh_name;
+                        shdr.sh_type = s1->sh_type;
+                        shdr.sh_flags = s1->sh_flags;
+                        shdr.sh_addr = 0; // Nesne dosyasında adres mutlak suretle 0 olmalıdır
+                        shdr.sh_offset = s1->sh_offset;
+                        shdr.sh_size = s1->data_offset;
+                        shdr.sh_link = s1->link ? s1->link->sh_num : 0;
+                        shdr.sh_info = s1->sh_info;
+                        shdr.sh_addralign = s1->sh_addralign ? s1->sh_addralign : 4;
+                        shdr.sh_entsize = s1->sh_entsize;
+
+                        __asm__ __volatile__ (
+                            ".intel_syntax noprefix\n"
+                            "mov eax, 4\n"
+                            "int 0x40\n"
+                            ".att_syntax\n"
+                            :: "b" (trdos_fd), "c" (&shdr), "d" (sizeof(Elf32_Shdr)) : "eax"
+                        );
+                    }
+                }
+
+                /* 5. ARTIK DOSYA BOYUTU NETLEŞTİ: ANA ELF BAŞLIĞINI (HEADER) DOLDUR */
+                memset(&ehdr, 0, sizeof(Elf32_Ehdr));
+
+                // Evrensel Sihirli ELF İmzası: \x7fELF
+                memcpy(ehdr.e_ident, "\x7f\x45\x4c\x46\x01\x01\x01\x00", 8); 
+
+                ehdr.e_type = ET_REL;       /* Sadece nesne (relocatable) dosyası */
+                ehdr.e_machine = EM_386;    /* Intel 386 Intel Mimarisi */
+                ehdr.e_version = EV_CURRENT;
+
+                /* =========================================================================
+                   LOKOMOTİF MÜHÜRÜ: TABLO OFSETİNİ KESİN KOORDİNATA KİLİTLE
+                   ========================================================================= */
+                // ehdr.e_shoff değeri, yukarıdaki payload döngüsünün bittiği,
+                // yani Section Header Table'ın GERÇEKTEN başladığı file_offset olmalıdır!
+                // ehdr.e_shoff = file_offset;
+
+                ehdr.e_shnum = s->nb_sections; /* TCC'nin ürettiği toplam gerçek bölüm sayısı */
+
+                // .shstrtab (Bölüm isimleri string tablosu) indeksini orijinal TCC'den mühürle
+                ehdr.e_shstrndx = strtab_section ? strtab_section->sh_num : (s->nb_sections - 1);
+
+                ehdr.e_ehsize = sizeof(Elf32_Ehdr);   // 52 Byte
+                ehdr.e_shentsize = sizeof(Elf32_Shdr); // 40 Byte
+
+                /* 6. DOSYANIN EN BAŞINA DÖN VE NESNE BAŞLIĞINI MÜHÜRLE */
+                lseek(c_fd, 0, SEEK_SET);
+                __asm__ __volatile__ (
+                    ".intel_syntax noprefix\n"
+                    "mov eax, 4\n"
+                    "int 0x40\n"
+                    ".att_syntax\n"
+                    :: "b" (trdos_fd), "c" (&ehdr), "d" (sizeof(Elf32_Ehdr)) : "eax"
+                );
             }
-
-            /* EXECUTE STEP D: Safely finalize file transaction closing target handle (sys_close = 6) */
+        else {
+            /* =========================================================================
+               ORİJİNAL TRDOS FLAT BINARY (.PRG) MOTORUNUZ (HİÇ DOKUNULMADI)
+               ========================================================================= */
+            /* EXECUTE STEP B: Commit fully-linked .text flat code segment to disk (sys_write = 4) */
             __asm__ __volatile__ (
                 ".intel_syntax noprefix\n"
-                "mov eax, 6\n" 
+                "mov eax, 4\n"
                 "int 0x40\n"
                 ".att_syntax\n"
                 :
-                : "b" (trdos_fd)
+                : "b" (trdos_fd), "c" (text_ptr), "d" (text_size)
                 : "eax"
             );
 
-            /* EXECUTE STEP E: Force absolute process escape returning directly to the shell prompt (sys_exit = 1) */
-            __asm__ __volatile__ (
-                ".intel_syntax noprefix\n"
-                "mov ebx, 0\n"
-                "mov eax, 1\n"
-                "int 0x40\n"
-                ".att_syntax\n"
-            );
+            /* EXECUTE STEP C: Append contiguous data layout segment (.data) if initialized on build */
+            if (data_section && data_section->data_offset > 0) {
+               unsigned char *data_ptr = data_section->data;
+               unsigned int data_size = data_section->data_offset;
+
+               __asm__ __volatile__ (
+                   ".intel_syntax noprefix\n"
+                   "mov eax, 4\n"
+                   "int 0x40\n"
+                   ".att_syntax\n"
+                   :
+                   : "b" (trdos_fd), "c" (data_ptr), "d" (data_size)
+                   : "eax"
+               );
+            }
         }
+
+        /* EXECUTE STEP D: Safely finalize file transaction closing target handle (sys_close = 6) */
+        __asm__ __volatile__ (
+            ".intel_syntax noprefix\n"
+            "mov eax, 6\n"
+            "int 0x40\n"
+            ".att_syntax\n"
+            :
+            : "b" (trdos_fd)
+            : "eax"
+        );
+
+        /* EXECUTE STEP E: Force absolute process escape returning directly to the shell prompt (sys_exit = 1) */
+        __asm__ __volatile__ (
+            ".intel_syntax noprefix\n"
+            "mov ebx, 0\n"
+            "mov eax, 1\n"
+            "int 0x40\n"
+            ".att_syntax\n"
+        );
     }
+}
 
 the_end:
     tcc_delete(s);
