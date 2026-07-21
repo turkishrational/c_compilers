@@ -367,7 +367,7 @@ struct TCCState {
 
     /* If true, standard compiler system headers are completely bypassed */
     int nostdinc;
-    
+
     /* If true, enforces absolute pure static compilation linking modes */
     int static_link;
 
@@ -988,71 +988,57 @@ static void strcat_printf(char *buf, int buf_size, const char *fmt, ...)
 }
 
 /* Internal detailed diagnostics generator tracking structural preprocessor include file trace stacks */
-void error1(TCCState *s1, int is_warning, const char *fmt, va_list ap)
+/* 20/07/2026 - Google AI */
+/* =========================================================================
+   TRDOS 386 FLAT BELLEK UYUMLU DOĞRUDAN DIAGNOSTIC MOTORU
+   ========================================================================= */
+void error1_flat(TCCState *s1, const char *fmt, void *arg1, void *arg2, void *arg3)
 {
-    char buf[2048];
     BufferedFile **f;
-    
-    buf[0] = '\0';
-    if (file) {
-        for(f = s1->include_stack; f < s1->include_stack_ptr; f++)
-            strcat_printf(buf, sizeof(buf), "In file included from %s:%d:\n", 
-                          (*f)->filename, (*f)->line_num);
-        if (file->line_num > 0) {
-            strcat_printf(buf, sizeof(buf), 
-                          "%s:%d: ", file->filename, file->line_num);
-        } else {
-            strcat_printf(buf, sizeof(buf),
-                          "%s: ", file->filename);
+  
+    /* 1. Include yığın izleme mekanizması */
+    if (file && s1) {
+        for(f = s1->include_stack; f < s1->include_stack_ptr; f++) {
+            if (*f && (*f)->filename) {
+                printf("In file included from %s:%d:\n", (*f)->filename, (*f)->line_num);
+            }
+        }
+        /* 2. Dosya adı ve satır numarası basımı */
+        if (file->filename) {
+            if (file->line_num > 0) {
+                printf("%s:%d: ", file->filename, file->line_num);
+            } else {
+                printf("%s: ", file->filename);
+            }
         }
     } else {
-        strcat_printf(buf, sizeof(buf), "tcc: ");
+        printf("tcc: ");
     }
     
-    if (is_warning)
-        strcat_printf(buf, sizeof(buf), "warning: ");
+    printf("error: ");
         
-    strcat_vprintf(buf, sizeof(buf), fmt, ap);
-
-    /* Enforce global safe routing directly through our overridden trdos_print engine */
-    if (!s1->error_func) {
-        printf("%s\n", buf);
-    } else {
-        s1->error_func(s1->error_opaque, buf);
-    }
-    
-    if (!is_warning)
-        s1->nb_errors++;
-}
-
-/* =========================================================================
-   GOOGLE AI & ERDOGAN TAN - NON-ABORTING DIAGNOSTIC INTERCEPTOR
-   =========================================================================
-   Logs non-fatal operational warning parameters via our native printf bridge 
-   without breaking the primary parsing loop pipelines. Uses precise pointer 
-   arithmetic vectoring to extract argument values sequentially. */
-void error_noabort(const char *fmt, ...)
-{
-    extern int printf(const char *format, ...);
-    printf("\n-> [TCC WARNING/ERROR]: ");
-    printf(fmt, ((void**)&fmt)[1], ((void**)&fmt)[2], ((void**)&fmt)[3]);
+    /* 3. Kararsız vprintf yerine standart printf ile güvenli formatlama */
+    printf(fmt, arg1, arg2, arg3);
     printf("\n");
-    return;
+
+    if (s1) s1->nb_errors++;
 }
 
+/* 20/07/2026 - Google AI */
 /* =========================================================================
    GOOGLE AI & ERDOGAN TAN - CRITICAL FATAL EVACUATION SHIELD
-   =========================================================================
-   Intercepts critical syntactic anomalies, prints clear diagnostics, and 
-   instantly triggers an uncatchable low-level native sys_exit (EAX=1) 
-   interrupt. This hard shield guarantees protection for the TRDOS 386 kernel 
-   by completely isolating broken code execution paths. */
+   ========================================================================= */
 void error(const char *fmt, ...)
 {
-    extern int printf(const char *format, ...);
+    TCCState *s1 = tcc_state;
+    void **args = (void **)&fmt;
+
     printf("\n-> [TCC FATAL ERROR]: ");
-    printf(fmt, ((void**)&fmt)[1], ((void**)&fmt)[2], ((void**)&fmt)[3]);
-    printf("\n-> [TRDOS SHIELD]: Terminating via sys_exit(1).\n");
+    
+    /* va_list kullanılmaz! Stack üzerindeki argümanlar sıralı olarak yakalanır */
+    error1_flat(s1, fmt, args[1], args[2], args[3]);
+
+    printf("-> [TRDOS SHIELD]: Terminating via sys_exit(1).\n");
 
     /* Fatal enforcement trap: Trigger hardware system exit interrupt call */
     __asm__ __volatile__ (
@@ -1064,21 +1050,39 @@ void error(const char *fmt, ...)
     );
 }
 
+/* 20/07/2026 - Google AI */
+/* =========================================================================
+   GOOGLE AI & ERDOGAN TAN - NON-ABORTING DIAGNOSTIC INTERCEPTOR
+   =========================================================================
+   Artık error1'i çağırarak dosya adı ve satır numarasını görünür kılar. */
+void error_noabort(const char *fmt, ...)
+{
+    TCCState *s1 = tcc_state;
+    void **args = (void **)&fmt;
+
+    printf("\n-> [TCC WARNING/ERROR]: ");
+
+    /* va_list kullanılmaz! Stack üzerindeki argümanlar sıralı olarak yakalanır */
+    error1_flat(s1, fmt, args[1], args[2], args[3]);
+
+    printf("\n");
+}
+
 /* Raise strict structural token expectation failures */
 void expect(const char *msg)
 {
     error("%s expected", msg);
 }
 
+/* 20/07/2026 */
 /* Capture standard grammar deviations sending localized traces to the tracker engine */
 void warning(const char *fmt, ...)
 {
     TCCState *s1 = tcc_state;
-    va_list ap;
+    void **args = (void **)&fmt;
 
-    va_start(ap, fmt);
-    error1(s1, 1, fmt, ap);
-    va_end(ap);
+    /* va_list kullanılmaz! Stack üzerindeki argümanlar sıralı olarak yakalanır */
+    error1_flat(s1, fmt, args[1], args[2], args[3]);
 }
 
 /* Enforce validation for expected language punctuation markers advancing on match */
@@ -8566,6 +8570,68 @@ static const TCCOption tcc_options[] = {
     { NULL },
 };
 
+/* 20/07/2026 - Google AI */
+/* =========================================================================
+   GOOGLE AI & ERDOGAN TAN - GLOBAL UNDEFINED SYMBOL GUARD (REVISED)
+   ========================================================================= */
+/* Dosya diskete mühürlenmeden hemen önce çağrılmalıdır. */
+
+void check_undefined_symbols(TCCState *s1) {
+    Section *symtab = 0;
+    Section *strtab = 0;
+    Elf32_Sym *sym;
+    const char *sym_name;
+    int i, j, sym_count;
+
+    if (!s1 || !s1->sections) return;
+    
+    /* 1. Seksiyondaki Sembol ve String Tablolarını Dinamik Olarak Bul */
+    for (i = 0; i < s1->nb_sections; i++) {
+        if (s1->sections[i]) {
+            /* SHT_SYMTAB = 2 (Sembol Tablosu) */
+            if (s1->sections[i]->sh_type == 2) {
+                symtab = s1->sections[i];
+            }
+            /* SHT_STRTAB = 3 (String Tablosu) ve adı ".strtab" olan ana tablo */
+            else if (s1->sections[i]->sh_type == 3) {
+                strtab = s1->sections[i];
+            }
+        }
+    }
+
+    /* Eğer tablolar sistemde yoksa taramayı güvenle atla */
+    if (!symtab || !symtab->data || !strtab || !strtab->data) return;
+
+    sym_count = symtab->data_offset / sizeof(Elf32_Sym);
+    sym = (Elf32_Sym *)symtab->data;
+
+    /* 2. Tanımsız (SHN_UNDEF) Sembol Kaçaklarını Tara */
+    for (j = 0; j < sym_count; j++) {
+        /* SHN_UNDEF (0): Çözülmemiş harici referanslar */
+        /* (sym[j].st_info >> 4) != 2 -> STB_WEAK (zayıf bağ) olmayan mutlak bağımlılıklar */
+        if (sym[j].st_shndx == 0 && (sym[j].st_info >> 4) != 2) { 
+            
+            sym_name = (char *)strtab->data + sym[j].st_name;
+            
+            /* Boş veya dahili TCC sembollerini süz */
+            if (sym_name && sym_name[0] != '\0') {
+                /* TRDOS Terminaline hatayı açıkça bas */
+                printf("\n-> [TRDOS LINKER ERROR]: Undefined reference to symbol '%s'\n", sym_name);
+                printf("-> [TRDOS SHIELD]: Link aborted to prevent CPU Exception.\n");
+                
+                /* Ring 0 sys_exit(1) donanım kalkanını tetikle ve üretimi durdur */
+                __asm__ __volatile__ (
+                    ".intel_syntax noprefix\n"
+                    "mov ebx, 1\n"
+                    "mov eax, 1\n"
+                    "int 0x40\n"
+                    ".att_syntax\n"
+                );
+            }
+        }
+    }
+}
+
 /* Master Executable Entry Point: Orchestrates the command-line argument pipeline and triggers compiler stages */
 int main(int argc, char **argv)
 {
@@ -8821,7 +8887,11 @@ int main(int argc, char **argv)
         tcc_relocate(s);
     }
 
-    /* 19/07/2026 - Google AI - 22:16 - (0.9.18-0.9.27) */
+    /* 20/07/2026 - Google AI */
+    /* 0.9.18 uyumlu evrensel eksik fonksiyon avcısı devrede */
+    check_undefined_symbols(s);
+
+     /* 19/07/2026 - Google AI - 22:16 - (0.9.18-0.9.27) */
     /* =========================================================================
        TRDOS 386 REFERANS TCC - OUTPUT WRITER PIPELINE (SEALED)
        ========================================================================= */
