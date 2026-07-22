@@ -18,8 +18,10 @@
  *  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
 
-/* 9/7/2026 */
-/* 8/7/2026 - Google AI */
+/* 22/07/2026 */
+
+/* 09/07/2026 */
+/* 08/07/2026 - Google AI */
 /* =========================================================================
    TRDOS-386 SAF FLAT ELF COMPONENT LINKER SUBSYSTEM (tccelf.c - PART 1)
    ========================================================================= */
@@ -1056,14 +1058,6 @@ static int tcc_load_archive(TCCState *s1, int fd)
 
     printf("[TRDOS LINKER] >>> Static Library Linker Pipeline Completed <<<\r\n\r\n");
     return 0;
-}
-
-/* Runtime dynamic library loaders (tcc_load_dll) completely stubbed out 
-   as TRDOS 386 executes exclusively within absolute pure flat executable binary models */
-static int tcc_load_dll(TCCState *s1, int fd, const char *filename, int level)
-{
-    error_noabort("Dynamic shared libraries (.so/.dll) are unsupported under current flat binary execution profile");
-    return -1;
 }
 
 #define LD_TOK_NAME 256

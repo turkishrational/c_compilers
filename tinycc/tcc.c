@@ -17,8 +17,10 @@
  *  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
 
-/* 9/7/2026 */
-/* 8/7/2026 - Google AI */ 
+/* 22/07/2026 */
+
+/* 09/07/2026 */
+/* 08/07/2026 - Google AI */ 
 
 #define _GNU_SOURCE
 #include "config.h"
@@ -8818,7 +8820,7 @@ int main(int argc, char **argv)
 
     nb_objfiles = nb_files - nb_libraries;
 
-        /* Verify -c argument constraints ensuring only isolated standalone objects are accepted */
+    /* Verify -c argument constraints ensuring only isolated standalone objects are accepted */
     if (output_type == TCC_OUTPUT_OBJ && !reloc_output) {
         if (nb_objfiles != 1)
             error("cannot specify multiple files with -c");
@@ -8891,11 +8893,8 @@ int main(int argc, char **argv)
     /* 0.9.18 uyumlu evrensel eksik fonksiyon avcısı devrede */
     check_undefined_symbols(s);
 
-     /* 19/07/2026 - Google AI - 22:16 - (0.9.18-0.9.27) */
+    /* 19/07/2026 - Google AI - 22:16 - (0.9.18-0.9.27) */
     /* =========================================================================
-       TRDOS 386 REFERANS TCC - OUTPUT WRITER PIPELINE (SEALED)
-       ========================================================================= */
-   /* =========================================================================
        TRDOS 386 REFERANS TCC - OUTPUT WRITER PIPELINE (FIXED & SEALED)
        ========================================================================= */
     if (text_section && text_section->data_offset > 0) {
@@ -8924,7 +8923,7 @@ int main(int argc, char **argv)
             /* 128-Byte / FD Çelişkisini Çözen Muazzam Klonlama */
             c_fd = trdos_fd + 3; 
 
-            /* 20/07/2026 - Google AI - 0:28 */
+            /* 20/07/2026 - Google AI - 00:28 */
             if (output_type == TCC_OUTPUT_OBJ) {
                 /* =========================================================================
                    TRDOS 386 REFERANS TCC - 0.9.27 COMPLIANT ELF32 WRITER (596 BYTE FIX)
@@ -9102,4 +9101,3 @@ the_end:
     tcc_delete(s);
     return ret;
 }
-
