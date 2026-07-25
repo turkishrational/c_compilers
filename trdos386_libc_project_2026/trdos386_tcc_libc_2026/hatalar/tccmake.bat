@@ -1,1 +1,0 @@
-gcc tcc.o libc/memset.o libc/memcpy.o libc/strlen.o libc/strcmp.o libc/strcpy.o libc/memcmp.o libc/strchr.o libc/strrchr.o libc/memmove.o libc/strncmp.o libc/chkstk.o libc/gcc_stubs.o libc/libc_core.o libc/libc_support.o libc/lseek.o libc/tell.o open.o close.o read.o write.o libc/sbrk.o libc/crt0.o libc/math64.o -o tcc.exe -nostdlib > hatalar_nihai_son.txt 2>&1
