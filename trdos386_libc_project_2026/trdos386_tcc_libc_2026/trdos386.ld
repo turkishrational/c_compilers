@@ -61,12 +61,10 @@ PROVIDE(__mingw_vsprintf = _sprint);
 PROVIDE(__mingw_vfprintf = __print);
 PROVIDE(__mingw_vprintf = __print);
 
-PROVIDE(__mingw_vfprintf = __print);
 PROVIDE(__mingw_vfprintf = _print);
 PROVIDE(___mingw_vfprintf = __print);
 PROVIDE(___mingw_vfprintf = _print);
 
-PROVIDE(__mingw_vprintf = __print);
 PROVIDE(__mingw_vprintf = _print);
 PROVIDE(___mingw_vprintf = __print);
 PROVIDE(___mingw_vprintf = _print);
