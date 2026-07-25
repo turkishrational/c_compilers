@@ -18,6 +18,8 @@
  *  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
 
+/* 24/07/2026 */
+
 static int asm_get_local_label_name(TCCState *s1, unsigned int n)
 {
     char buf[64];
@@ -567,12 +569,43 @@ static void subst_asm_operands(ASMOperand *operands, int nb_operands,
                 error("invalid operand reference after %%");
             op = &operands[index];
             sv = *op->vt;
+
+	    /* 24/07/2026 - Google AI - DEBUG */
+
+            /* LOG 1: Blok öncesi saf yığın değerini mühürlüyoruz */
+            // printf("[DEEP DEBUG 1] BEFORE IF -> Op:%d, op->reg=%d, sv.r=0x%04X, sv.c.ul=%d\n", 
+            //      index, op->reg, sv.r, (int)sv.c.ul);
+
+            /* 24/07/2026 - Google AI */
+            /* =========================================================================
+               TRDOS 386 - SUBST ASM VALUE CELL REALTIME DEBUG (24/07/2026)
+               ========================================================================= */
+           // printf("[SUBST DEBUG] Op:%d, Constraint='%s', sv.r=0x%04X, sv.c.ul=%d\n", 
+           //     index, op->constraint, sv.r, (int)sv.c.ul);
+
             if (op->reg >= 0) {
-                sv.r = op->reg;
-                if ((op->vt->r & VT_VALMASK) == VT_LLOCAL)
-                    sv.r |= VT_LVAL;
+
+              /* LOG 2: Sadece bu bloğun içine girilirse tetiklenecek sinsi kanca */
+              // printf("  --> [ALERT]: IF BLOCK TRIGGERED for Op:%d (op->reg = %d)\n", index, op->reg);
+
+               sv.r = op->reg;
+               if ((op->vt->r & VT_VALMASK) == VT_LLOCAL)
+                   sv.r |= VT_LVAL;
             }
+
+            /* LOG 3: Alt fonksiyona teslim edilen nihai SValue paketini yakalıyoruz */
+            // printf("[DEEP DEBUG 2] INPUT TO SUBST_ASM_OPERAND -> sv.r=0x%04X, sv.c.ul=%d\n", 
+            //     sv.r, (int)sv.c.ul);
+
+            /* Alt fonksiyonun dönüş değerini dize bazlı izole etmek için tampon uzunluk takibi */
+            int start_size = out_str->size;
+
             subst_asm_operand(out_str, &sv, modifier);
+
+            /* LOG 4: Fonksiyonun dönüşünde out_str tamponuna tam olarak ne eklendiğini basıyoruz! */
+            // printf("[DEEP DEBUG 3] OUTPUT FROM SUBST_ASM_OPERAND -> Appended String: \"%s\"\n\n", 
+            //     (char *)(out_str->data + start_size));
+
         } else {
         add_char:
             cstr_ccat(out_str, c);
@@ -581,7 +614,6 @@ static void subst_asm_operands(ASMOperand *operands, int nb_operands,
         }
     }
 }
-
 
 static void parse_asm_operands(ASMOperand *operands, int *nb_operands_ptr,
                                int is_output)
@@ -623,7 +655,9 @@ static void parse_asm_operands(ASMOperand *operands, int *nb_operands_ptr,
                     gv(RC_INT);
                 }
             }
+            
             op->vt = vtop;
+
             skip(')');
             if (tok == ',') {
                 next();
@@ -725,8 +759,25 @@ static void asm_instr(void)
     printf("subst_asm: \"%s\"\n", (char *)astr1.data);
 #endif
 
+/* 24/07/2026 - Google AI - DEBUG */
+/* =========================================================================
+       TRDOS 386 - INLINE ASM MULTI-OPERAND DEBUG SHIELD (24/07/2026)
+   ========================================================================= */
+//  printf("\n[TCC DEBUG] Total ASM Operands: %d (Outputs: %d)\n", nb_operands, nb_outputs);
+//  for (i = 0; i < nb_operands; i++) {
+//      /* operands[i].vt alanı tcc.c evaluation yığınındaki canlı SValue hücresidir */
+//      if (operands[i].vt) {
+//         printf(" -> Operand[%d]: Constraint='%s', r_flags=0x%04X, c_offset=%d\n", 
+//                i, operands[i].constraint, 
+//                operands[i].vt->r, 
+//                (int)operands[i].vt->c.ul);
+//     } else {
+//          printf(" -> Operand[%d]: Constraint='%s', VT IS NULL!\n", i, operands[i].constraint);
+//      }
+//  }
+
     /* generate loads */
-    asm_gen_code(operands, nb_operands, nb_outputs, 0, clobber_regs);    
+    asm_gen_code(operands, nb_operands, nb_outputs, 0, clobber_regs);
 
     /* assemble the string with tcc internal assembler */
     tcc_assemble_inline(tcc_state, astr1.data, astr1.size - 1);
@@ -735,8 +786,8 @@ static void asm_instr(void)
     next();
 
     /* store the output values if needed */
-    asm_gen_code(operands, nb_operands, nb_outputs, 1, clobber_regs);    
-    
+    asm_gen_code(operands, nb_operands, nb_outputs, 1, clobber_regs);
+
     /* free everything */
     for(i=0;i<nb_operands;i++) {
         ASMOperand *op;

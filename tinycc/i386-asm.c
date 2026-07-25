@@ -18,6 +18,8 @@
  *  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
 
+/* 24/07/2026 */
+
 #define MAX_OPERANDS 3
 
 typedef struct ASMInstr {
@@ -951,17 +953,86 @@ static void subst_asm_operand(CString *add_str,
         val = sv->c.i;
         if (modifier == 'n')
             val = -val;
-        snprintf(buf, sizeof(buf), "%d", sv->c.i);
+
+        // snprintf(buf, sizeof(buf), "%d", sv->c.i);
+	/* 24/07/2026 - Google AI */
+        /* DÜZELTME: snprintf(buf, sizeof(buf), "%d", sv->c.i); SATIRINI SİLİN / DEĞİŞTİRİN */
+        /* Sayısal sabitleri (örn: $35 veya etiket farkları) risksiz ve saf C ile dizeye çeviriyoruz */
+        char *p = buf;
+        unsigned int uval = (val < 0) ? -val : val;
+        
+        if (val < 0) {
+            *p++ = '-';
+        }
+        
+        if (uval == 0) {
+            *p++ = '0';
+        } else {
+            char tmp[32];
+            int t_idx = 0;
+            while (uval > 0) {
+                tmp[t_idx++] = (uval % 10) + '0';
+                uval /= 10;
+            }
+            while (t_idx > 0) {
+                *p++ = tmp[--t_idx];
+            }
+        }
+        *p = '\0'; /* Kesin NULL sonlandırma */
+	/* .... */
         cstr_cat(add_str, buf);
     } else if ((r & VT_VALMASK) == VT_LOCAL) {
-        snprintf(buf, sizeof(buf), "%d(%%ebp)", sv->c.i);
+        // snprintf(buf, sizeof(buf), "%d(%%ebp)", sv->c.i);
+	/* 24/07/2026 - Google AI */
+        /* Güvenli ve kusursuz tamsayı dize dönüştürücü kalkanı */
+        char *p = buf;
+        unsigned int val = (unsigned int)sv->c.ul;
+        int is_neg = 0;
+
+        /* Eğer offset negatif bir yığın frame adresi ise (-) işaretini mühürle */
+        if ((int)val < 0) {
+            is_neg = 1;
+            val = -(int)val;
+            *p++ = '-';
+        }
+
+        if (val == 0) {
+            *p++ = '0';
+        } else {
+            char tmp[32];
+            int t_idx = 0;
+            while (val > 0) {
+                tmp[t_idx++] = (val % 10) + '0';
+                val /= 10;
+            }
+            while (t_idx > 0) {
+                *p++ = tmp[--t_idx];
+            }
+        }
+
+        /* "(%ebp)" ekini saf string birleştirmesiyle güvenli yatağa mühürle */
+        *p++ = '(';
+        *p++ = '%';
+        *p++ = 'e';
+        *p++ = 'b';
+        *p++ = 'p';
+        *p++ = ')';
+        *p = '\0'; /* Kesin NULL sonlandırma */
+	/* .... */
         cstr_cat(add_str, buf);
     } else if (r & VT_LVAL) {
         reg = r & VT_VALMASK;
         if (reg >= VT_CONST)
             error("internal compiler error");
-        snprintf(buf, sizeof(buf), "(%%%s)", 
-                 get_tok_str(TOK_ASM_eax + reg, NULL));
+        // snprintf(buf, sizeof(buf), "(%%%s)", 
+        //         get_tok_str(TOK_ASM_eax + reg, NULL));
+	/* 24/07/2026 - Google AI */
+        /* DÜZELTME: Orijinal parantez şemasını ve TOK_ASM_eax kaymasını bozmadan koruyoruz */
+        buf[0] = '(';
+        buf[1] = '%';
+        strcpy(buf + 2, get_tok_str(TOK_ASM_eax + reg, NULL));
+        strcat(buf, ")");
+	/* .... */
         cstr_cat(add_str, buf);
     } else {
         /* register case */
@@ -1005,7 +1076,12 @@ static void subst_asm_operand(CString *add_str,
             reg = TOK_ASM_eax + reg;
             break;
         }
-        snprintf(buf, sizeof(buf), "%%%s", get_tok_str(reg, NULL));
+        // snprintf(buf, sizeof(buf), "%%%s", get_tok_str(reg, NULL));
+       	/* 24/07/2026 - Google AI */
+        /* DÜZELTME: Kalan son snprintf'i de tamamen imha ederek saf string kopyalamasına geçiyoruz */
+        buf[0] = '%';
+        strcpy(buf + 1, get_tok_str(reg, NULL));
+	/* .... */
         cstr_cat(add_str, buf);
     }
 }

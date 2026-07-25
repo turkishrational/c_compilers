@@ -17,8 +17,8 @@
  *  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
 
+/* 24/07/2026 */
 /* 22/07/2026 */
-
 /* 09/07/2026 */
 /* 08/07/2026 - Google AI */ 
 
@@ -283,7 +283,9 @@ static int parse_flags;
 #define PARSE_FLAG_PREPROCESS 0x0001 /* Enforce standard source preprocessor execution tracking */
 #define PARSE_FLAG_TOK_NUM    0x0002 /* Interpret character sequences as raw native numbers directly */
 #define PARSE_FLAG_LINEFEED   0x0004 /* Capture carriage break signals returning them as standard tokens */
- 
+/* 24/07/2026 - Google AI */
+// #define PARSE_FLAG_ASM_COMMENTS 0x0008  /* 0.9.23/0.9.27 kısıtlama takipleri için eklenen maske */
+
 /* Core structural section endpoints mapped globally within memory architecture */
 static Section *text_section, *data_section, *bss_section; 
 static Section *cur_text_section; /* Target structural window code execution engine active mapping */
@@ -740,10 +742,18 @@ static char *pstrcat(char *buf, int buf_size, const char *s)
     return buf;
 }
 
+/* 24/07/2026 - Google AI */
+/* =========================================================================
+   TRDOS 386 - TCC_FREE SAFE PURE RET ALIAS ANCHOR (25/07/2026)
+   ========================================================================= */
+extern void trdos_free(void *ptr);
+
 /* Absolute minimal heap allocation wrappers tailored for TRDOS 386 native workspace */
 static inline void tcc_free(void *ptr)
 {
-    free(ptr);
+    // free(ptr);
+    /* 24/07/2026 */
+    trdos_free(ptr);
 }
 
 static void *tcc_malloc(unsigned long size)

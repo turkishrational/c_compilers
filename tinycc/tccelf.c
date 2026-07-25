@@ -300,7 +300,7 @@ static void sort_syms(TCCState *s1, Section *s)
             }
         }
     }
-    
+
     tcc_free(old_to_new_syms);
 }
 
