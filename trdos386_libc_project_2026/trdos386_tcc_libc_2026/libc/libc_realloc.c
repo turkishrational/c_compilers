@@ -94,9 +94,77 @@ void *realloc(void *ptr, unsigned int size) {
     return _mingw_realloc(ptr, size);
 }
 
+// void *malloc(unsigned int size) {
+//     return _mingw_realloc(NULL, size);
+// }
+
+/* 26/6/2026 - Google AI */
+/* TRDOS Kernel Sistem Çaðrýsý Yardýmcýlarý */
+// #define SYS_BREAK 17
+
 void *malloc(unsigned int size) {
-    return _mingw_realloc(NULL, size);
+    unsigned int current_break = 0;
+    unsigned int new_break = 0;
+    unsigned int aligned_size = 0;
+    char *ptr;
+    unsigned int i;
+
+    if (size == 0) return NULL;
+
+    /* 1. ADIM: 4-Byte i386 Dword Hizalamasý (Small-C and al, not 3 mantýðý) */
+    aligned_size = (size + 3) & ~3;
+
+    /* 2. ADIM: sys_break, -1 ile mevcut u.break (BSS sonu) adresini kernel'dan alýyoruz */
+    __asm__ __volatile__ (
+        ".intel_syntax noprefix\n"
+        "mov ebx, -1\n"
+        "mov eax, 17\n"     /* sys_break çaðýrma numarasý */
+        "int 0x40\n"
+        "mov %0, eax\n"     /* Dönen mevcut u.break adresini yakala */
+        ".att_syntax\n"
+        : "=r" (current_break)
+        :: "eax", "ebx"
+    );
+
+    /* 4-Byte Hizalamayý mevcut adrese de uyguluyoruz */
+    current_break = (current_break + 3) & ~3;
+
+    /* Yeni hedef break noktasý hesaplanýyor */
+    new_break = current_break + aligned_size;
+
+    /* 3. ADIM: sys_break, new_break ile kernel'daki u.break sýnýrýný geniþletiyoruz */
+    int status = 0;
+    __asm__ __volatile__ (
+        ".intel_syntax noprefix\n"
+        "mov ebx, %1\n"     /* ebx = yeni u.break adresi */
+        "mov eax, 17\n"
+        "int 0x40\n"
+        "mov %0, eax\n"     /* Baþarý durumunu al */
+        ".att_syntax\n"
+        : "=r" (status)
+        : "r" (new_break)
+        : "eax", "ebx"
+    );
+
+    /* Carry flag set ise veya kernel hata döndüyse (bellek yetersiz) NULL dön */
+    if (status < 0) {
+        return NULL;
+    }
+
+    /* 4. ADIM: DEMAND PAGING VE ZERO-FILL ZIRHI! */
+    /* Yeni ayrýlan bellek alanýnýn baþlangýç adresini ptr yapýyoruz */
+    ptr = (char *)current_break;
+
+    /* Kernel'ýn gizlice fiziksel sayfa atamasýný (Page Fault telafisini) tetiklemek ve */
+    /* çöpm verileri temizlemek için alana her byte için el ile Sýfýr (0) yazýyoruz (Write aný) */
+    for (i = 0; i < aligned_size; i++) {
+        ptr[i] = 0; /* Bu yazma iþlemi kernel'a güvenli sayfa (page) ayartýrýr! */
+    }
+
+    /* Baþlangýç adresini döndür */
+    return (void *)ptr;
 }
+
 
 void *calloc(unsigned int nelem, unsigned int elsize) {
     return _mingw_realloc(NULL, nelem * elsize);

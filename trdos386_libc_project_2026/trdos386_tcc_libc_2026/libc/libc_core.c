@@ -40,23 +40,23 @@ void * _imp___iob = _iob;
 
 /* High-Level IO Functions mapping directly to TRDOS 386 System Operations */
 
-void *fopen(const char *filename, const char *mode) {
-    int flags = 0;
-    int trdos_fd;
-    if (mode[0] == 'r') flags = 0;
-    else if (mode[0] == 'w') flags = 1;
-    else if (mode[0] == 'a') flags = 2;
+// void *fopen(const char *filename, const char *mode) {
+//    int flags = 0;
+//    int trdos_fd;
+//    if (mode[0] == 'r') flags = 0;
+//    else if (mode[0] == 'w') flags = 1;
+//    else if (mode[0] == 'a') flags = 2;
+//
+//    trdos_fd = open(filename, flags, 0);
+//    if (trdos_fd < 0) return NULL;
+//    return (void*)trdos_fd;
+// }
 
-    trdos_fd = open(filename, flags, 0);
-    if (trdos_fd < 0) return NULL;
-    return (void*)trdos_fd;
-}
-
-int fclose(void *stream) {
-    int fd = (int)stream;
-    if (fd >= 3 && fd <= 12) return close(fd);
-    return -1;
-}
+// int fclose(void *stream) {
+//    int fd = (int)stream;
+//    if (fd >= 3 && fd <= 12) return close(fd);
+//    return -1;
+// }
 
 /* =========================================================================
    AKILLI FREAD & FWRITE DÖNÜÞTÜRÜCÜSÜ (PHASE 3)
