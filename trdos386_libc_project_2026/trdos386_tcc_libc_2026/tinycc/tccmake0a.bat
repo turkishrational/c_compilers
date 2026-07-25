@@ -1,1 +1,0 @@
-gcc -c tcc.c -o tcc.o -DTCC_TARGET_I386 -nostdlib -O0 -fno-omit-frame-pointer -mpreferred-stack-boundary=2

@@ -1,3 +1,0 @@
-c:\tdm-gcc-32\bin\ld.exe -T trdos386.ld -o TCC.tmp tcc.o --start-group libc/*.o --end-group
-c:\tdm-gcc-32\bin\objcopy.exe -O binary TCC.tmp TCC.PRG
-del TCC.tmp

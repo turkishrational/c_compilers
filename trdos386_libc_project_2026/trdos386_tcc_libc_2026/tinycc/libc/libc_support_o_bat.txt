@@ -1,3 +1,0 @@
-del libc\libc_support.o
-
-gcc -c libc/libc_support.c -o libc/libc_support.o -nostdlib -mabi=sysv -fpack-struct=4 -mno-ms-bitfields -fno-ms-extensions -mpreferred-stack-boundary=2 -fno-stack-check -fno-stack-protector
