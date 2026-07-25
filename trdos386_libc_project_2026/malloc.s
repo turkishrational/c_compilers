@@ -3,6 +3,9 @@
 .global _malloc
 .global malloc
 
+/* 24/07/2026 */
+.global _trdos_free
+
 .text
 
 .align 4
@@ -78,4 +81,8 @@ malloc:
     pop ecx
     pop ebx
     pop ebp
+    ret
+
+_trdos_free:
+    xor eax, eax
     ret
