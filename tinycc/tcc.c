@@ -17,7 +17,9 @@
  *  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
 
+/* 29/07/2026 */
 /* 24/07/2026 */
+/* 23/07/2026 */
 /* 22/07/2026 */
 /* 09/07/2026 */
 /* 08/07/2026 - Google AI */ 
@@ -89,7 +91,7 @@ int tcc_add_library(struct TCCState *s, const char *libraryname);
 #define CONFIG_TCC_ASM
 
 /* Explicit library search path for crt0.o and core TRDOS objects */
-#define CONFIG_TCC_CRT_PREFIX "C:/TDM-GCC-32/tinycc/lib"
+#define CONFIG_TCC_CRT_PREFIX "lib"  /* 23/07/2026 */
 
 #define INCLUDE_STACK_SIZE  32
 #define IFDEF_STACK_SIZE    64
@@ -233,8 +235,11 @@ typedef struct BufferedFile {
     int ifndef_macro_saved;       /* Temporary state tracking register for preprocessor guards */
     int *ifdef_stack_ptr;         /* State evaluation tracking pointer recording active ifdef depth */
     char inc_type;                /* Context token tracking inclusion type ('<' or '"') */
-    char inc_filename[512];       /* Raw verbatim source path string typed by developer */
-    char filename[1024];          /* Final resolved canonical storage workspace file path */
+    // char inc_filename[512];    /* Raw verbatim source path string typed by developer */
+    // char filename[1024];       /* Final resolved canonical storage workspace file path */
+    /* 29/07/2026 */
+    char inc_filename[256];
+    char filename[256]; 
     unsigned char buffer[IO_BUF_SIZE + 1]; /* Extended hardware frame layout containing CH_EOB padding */
 } BufferedFile;
 
@@ -337,7 +342,7 @@ static int gnu_ext = 1;
 /* Enable native Tiny C specific compiler optimization extensions */
 static int tcc_ext = 1;
 
-/* 8/7/2026 - Google AI */
+/* 08/07/2026 - Google AI */
 int do_bounds_check = 0;
 Section *lbounds_section = NULL;
 
@@ -345,7 +350,7 @@ Section *lbounds_section = NULL;
 static struct TCCState *tcc_state;
 
 /* Base installation filesystem directory path routing internal include directories */
-static const char *tcc_lib_path = ".";   /* 9/7/2026 */
+static const char *tcc_lib_path = ".";   /* 09/07/2026 */
 
 /* Master global state container tracking compilation session metrics */
 struct TCCState {
@@ -372,14 +377,16 @@ struct TCCState {
     /* If true, standard compiler system headers are completely bypassed */
     int nostdinc;
 
+    /* 29/07/2026 */
     /* If true, enforces absolute pure static compilation linking modes */
-    int static_link;
+    // int static_link;
 
     /* Runtime compilation error interception mechanisms */
-    void *error_opaque;
-    void (*error_func)(void *opaque, const char *msg);
-    int error_set_jmp_enabled;
-    jmp_buf error_jmp_buf;
+    /* 29/07/2026 */    
+    // void *error_opaque;
+    // void (*error_func)(void *opaque, const char *msg);
+    // int error_set_jmp_enabled;
+    // jmp_buf error_jmp_buf;
     int nb_errors;
 
     /* Embedded architecture-specific inline assembler label stack descriptor */
@@ -7878,7 +7885,7 @@ static void decl(int l)
                 cur_text_section = ad.section;
                 if (!cur_text_section)
                     cur_text_section = text_section;
-                    
+
                 ind = cur_text_section->data_offset;
                 funcname = get_tok_str(v, NULL);
                 sym = sym_find(v);
@@ -7888,12 +7895,12 @@ static void decl(int l)
                     sym = global_identifier_push(v, type.t, 0);
                     sym->type.ref = type.ref;
                 }
-                
+
                 /* Commit function symbol entry straight into the output native ELF symbol tables map */
                 put_extern_sym(sym, cur_text_section, ind, 0);
                 func_ind = ind;
                 sym->r = VT_SYM | VT_CONST;
-                
+
                 /* Push a dummy symbol layout descriptor to initialize local function variable boundaries safely */
                 sym_push2(&local_stack, SYM_FIELD, 0, 0);
                 gfunc_prolog(&type); /* Emit function entry prologue code blocks */
@@ -7903,17 +7910,17 @@ static void decl(int l)
                 block(NULL, NULL, NULL, NULL, 0, 0); /* Parse internal statement code execution blocks */
                 gsym(rsym);
                 gfunc_epilog(); /* Emit function epilogue machine code structures */
-                
+
                 cur_text_section->data_offset = ind;
                 label_pop(&global_label_stack, NULL);
                 sym_pop(&local_stack, NULL); /* Reset and flush the localized function variable tracking stacks */
-                
+
                 /* Post-patch compiled symbol payload size calculations straight into the native ELF headers */
                 ((Elf32_Sym *)symtab_section->data)[sym->c].st_size = ind - func_ind;
-                
-                funcname = ""; 
-                func_vt.t = VT_VOID; 
-                ind = 0; 
+
+                funcname = "";
+                func_vt.t = VT_VOID;
+                ind = 0;
                 break;
             } else {
                 if (btype.t & VT_TYPEDEF) {
@@ -7928,7 +7935,7 @@ static void decl(int l)
                     if (!(type.t & VT_ARRAY))
                         r |= lvalue_type(type.t);
                     has_init = (tok == '=');
-                    if ((btype.t & VT_EXTERN) || 
+                    if ((btype.t & VT_EXTERN) ||
                         ((type.t & VT_ARRAY) && (type.t & VT_STATIC) && !has_init && l == VT_CONST && type.ref->c < 0)) {
                         /* External variable allocation path: Bind uninitialized null arrays as absolute external symbols */
                         external_sym(v, &type, r);
@@ -7976,7 +7983,7 @@ static int tcc_compile(TCCState *s1)
     preprocess_init(s1);
 
     funcname = "";
-    anon_sym = SYM_FIRST_ANOM; 
+    anon_sym = SYM_FIRST_ANOM;
     section_sym = 0; 
 
     /* Put localized file descriptor tracking details straight into the primary ELF symbol table text section */
@@ -7995,20 +8002,21 @@ static int tcc_compile(TCCState *s1)
     /* Secure Execution Shield: Completely bypass setjmp/longjmp error traps to guard register states.
        Forcing error jump buf trackers off prevents processing flow from entering critical memory faults. */
     s1->nb_errors = 0;
-    s1->error_set_jmp_enabled = 0;
+    /* 29/07/2026 */
+    // s1->error_set_jmp_enabled = 0;
 
     /* Synchronize input buffer pointers tracking terminal end-of-file milestones */
     ch = file->buf_ptr[0];
     tok_flags = TOK_FLAG_BOL | TOK_FLAG_BOF;
     parse_flags = PARSE_FLAG_PREPROCESS | PARSE_FLAG_TOK_NUM;
-    
+
     next();
     decl(VT_CONST); /* Launch the master parsing loop processing core syntax structures recursively */
-    
+
     if (tok != -1)
         expect("declaration");
 
-    s1->error_set_jmp_enabled = 0;
+    // s1->error_set_jmp_enabled = 0;
 
     /* Recycle allocated macro tables freeing macro definitions up to milestone milestone */
     free_defines(define_start); 
@@ -8038,7 +8046,7 @@ int tcc_compile_string(TCCState *s, const char *str)
     pstrcpy(bf->filename, sizeof(bf->filename), "<string>");
     bf->line_num = 1;
     file = bf;
-    
+
     ret = tcc_compile(s);
     tcc_free(buf);
 
@@ -8053,11 +8061,11 @@ void tcc_define_symbol(TCCState *s1, const char *sym, const char *value)
 
     pstrcpy(bf->buffer, IO_BUF_SIZE, sym);
     pstrcat(bf->buffer, IO_BUF_SIZE, " ");
-    
+
     if (!value) 
         value = "1";
     pstrcat(bf->buffer, IO_BUF_SIZE, value);
-    
+
     bf->fd = -1;
     bf->buf_ptr = bf->buffer;
     bf->buf_end = bf->buffer + strlen(bf->buffer);
@@ -8066,7 +8074,7 @@ void tcc_define_symbol(TCCState *s1, const char *sym, const char *value)
     ch = file->buf_ptr[0];
     bf->line_num = 1;
     file = bf;
-    
+
     s1->include_stack_ptr = s1->include_stack;
 
     ch = (int)(intptr_t)file->buf_ptr;
@@ -8094,31 +8102,31 @@ void tcc_undefine_symbol(TCCState *s1, const char *sym)
 #include "tccelf.c"
 
 /* Position printing from stabs debug section bypassed under TRDOS flat paradigm */
-static void rt_printline(unsigned long wanted_pc)
-{
-    /* STABS debug interpretation architecture siphoned away to retain core minimalism */
-}
+// static void rt_printline(unsigned long wanted_pc)
+// {
+//    /* STABS debug interpretation architecture siphoned away to retain core minimalism */
+// }
 
-#ifndef WIN32
+// #ifndef WIN32
 /* Runtime caller PC lookup bypassed to drop external ucontext dependencies */
-static int rt_get_caller_pc(unsigned long *paddr, void *uc, int level)
-{
-    return -1;
-}
+// static int rt_get_caller_pc(unsigned long *paddr, void *uc, int level)
+// {
+//    return -1;
+// }
 
 /* Emit runtime error notification tracking layers stubbed out cleanly */
-void rt_error(void *uc, const char *fmt, ...)
-{
+// void rt_error(void *uc, const char *fmt, ...)
+// {
     /* Fallback directly into our standard unified internal error trap */
-    error("Runtime error intercepted inside execution pipeline");
-}
+//    error("Runtime error intercepted inside execution pipeline");
+// }
 
 /* Signal handling triggers safely redirected straight to native absolute execution exit shields */
-static void sig_error(int signum, void *siginf, void *puc)
-{
-    exit(255);
-}
-#endif
+// static void sig_error(int signum, void *siginf, void *puc)
+// {
+//    exit(255);
+// }
+// #endif
 
 /* Execute all runtime or linkage relocations (mandatory before utilizing tcc_get_symbol() loops) */
 int tcc_relocate(TCCState *s1)
@@ -8433,7 +8441,9 @@ int tcc_add_library_path(TCCState *s, const char *pathname)
 /* Public API Entry: Resolve and append a library file utilizing short-hand token command markers (-l name) */
 int tcc_add_library(TCCState *s, const char *libraryname)
 {
-    char buf[1024];
+    // char buf[1024];
+    /* 29/07/2026 */
+    char buf[256];
     int i;
     
     /* Dynamic shared object loading bypassed completely under TRDOS pure static link design rules */
@@ -8458,11 +8468,13 @@ int tcc_add_symbol(TCCState *s, const char *name, unsigned long val)
 /* Configure the compilation output storage targets and map target system include directory trees */
 int tcc_set_output_type(TCCState *s, int output_type)
 {
-    char buf[1024];
+    /* 29/07/2026 */
+    // char buf[1024];
 
     s->output_type = output_type;
 
     if (!s->nostdinc) {
+        char buf[256];  /* 29/07/2026 */
         snprintf(buf, sizeof(buf), "%s/include", tcc_lib_path);
         tcc_add_sysinclude_path(s, buf);
     }
@@ -8491,13 +8503,13 @@ static int64_t getclock_us(void)
     return tv.tv_sec * 1000000LL + tv.tv_usec;
 }
 
+/* 29/07/2026 */
 /* Print the primary operational command line argument parameters documentation guide directly to stdout */
 void help(void)
 {
     printf("tcc version " TCC_VERSION " - Tiny C Compiler - Copyright (C) 2001, 2002 Fabrice Bellard\n" 
            "usage: tcc [-v] [-c] [-o outfile] [-Bdir] [-bench] [-Idir] [-Dsym[=val]] [-Usym]\n"
-           "           [-Ldir] [-llib] [-shared] [-static]\n"
-           "           [infile1 infile2...] [-run infile args...]\n"
+           "           [-Ldir] [-llib] [infile1 infile2...]\n"
            "\n"
            "General options:\n"
            "  -v          display current version\n"
@@ -8505,16 +8517,13 @@ void help(void)
            "  -o outfile  set output filename\n"
            "  -Bdir       set tcc internal library path\n"
            "  -bench      output compilation statistics\n"
-           "  -run        run compiled source\n"
            "Preprocessor options:\n"
            "  -Idir       add include path 'dir'\n"
            "  -Dsym[=val] define 'sym' with value 'val'\n"
            "  -Usym       undefine 'sym'\n"
            "Linker options:\n"
            "  -Ldir       add library path 'dir'\n"
-           "  -llib       link with dynamic or static library 'lib'\n"
-           "  -shared     generate a shared library\n"
-           "  -static     static linking\n"
+           "  -llib       link with static library 'lib'\n"
            "  -r          relocatable output\n"
            );
 }
@@ -8651,8 +8660,11 @@ int main(int argc, char **argv)
     int optind, output_type, multiple_files, i, reloc_output;
     TCCState *s;
     char **files;
-    int nb_files, nb_libraries, nb_objfiles, dminus, ret;
-    char objfilename[1024];
+    // int nb_files, nb_libraries, nb_objfiles, dminus, ret;
+    /* 29/07/2026 */
+    int nb_files, nb_libraries, nb_objfiles, ret;
+    // char objfilename[1024];
+    char objfilename[256];  /* 29/07/2026 */
     int64_t start_time = 0;
     const TCCOption *popt;
     const char *optarg, *p1, *r1, *outfile;
@@ -8689,7 +8701,8 @@ int main(int argc, char **argv)
     optind = 1;
     outfile = NULL;
     multiple_files = 1;
-    dminus = 0;
+    /* 29/07/2026 */
+    // dminus = 0;
     files = NULL;
     nb_files = 0;
     nb_libraries = 0;
@@ -8897,11 +8910,13 @@ int main(int argc, char **argv)
     /* LOKOMOTİF NEŞTERİ 1: -c modunda relocation kilitlenmesi atlanmalıdır! */
     if (output_type != TCC_OUTPUT_OBJ) {
         tcc_relocate(s);
+       /* 29/07/2026 */
+       check_undefined_symbols(s);
     }
 
     /* 20/07/2026 - Google AI */
     /* 0.9.18 uyumlu evrensel eksik fonksiyon avcısı devrede */
-    check_undefined_symbols(s);
+    // check_undefined_symbols(s);
 
     /* 19/07/2026 - Google AI - 22:16 - (0.9.18-0.9.27) */
     /* =========================================================================
@@ -9085,6 +9100,10 @@ int main(int argc, char **argv)
                 } 
             }
 
+	   /* 23/07/2026 */
+	   if (do_bench)
+              total_bytes = lseek(c_fd, 0, 1); // get file size
+
             /* EXECUTE STEP D: Safely finalize file transaction closing target handle (sys_close = 6) */
             __asm__ __volatile__ (
                 ".intel_syntax noprefix\n"
@@ -9095,6 +9114,17 @@ int main(int argc, char **argv)
                 : "b" (trdos_fd)
                 : "eax"
             );
+
+            /* 23/07/2026 */
+   	    if (do_bench) {
+               unsigned long total_time = (getclock_us() - start_time);
+               // if (total_time < 1)
+               //   total_time = 1;
+               // if (total_bytes < 1)
+               //    total_bytes = 1;
+               printf("%d idents, %d lines, %d bytes in %d timer ticks (18.2 Hz)\n",
+                      tok_ident - TOK_IDENT, total_lines, total_bytes, total_time);
+            }
 
             /* EXECUTE STEP E: Force absolute process escape returning directly to the shell prompt (sys_exit = 1) */
             __asm__ __volatile__ (
