@@ -1,5 +1,5 @@
 /* Automatically modified for Windows 32-bit Console Compilation */
-#define TCC_VERSION "0.9.18"
+#define TCC_VERSION "0.9.23"
 #define GCC_MAJOR 3
 #define HOST_I386 1
 

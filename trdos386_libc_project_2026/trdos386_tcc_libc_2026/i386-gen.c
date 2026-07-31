@@ -1,25 +1,27 @@
 /*
  *  X86 code generator for TCC
  * 
- *  Copyright (c) 2001, 2002 Fabrice Bellard
+ *  Copyright (c) 2001-2004 Fabrice Bellard
  *
- *  This program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2 of the License, or
- *  (at your option) any later version.
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2 of the License, or (at your option) any later version.
  *
- *  This program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *  GNU General Public License for more details.
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
  *
- *  You should have received a copy of the GNU General Public License
- *  along with this program; if not, write to the Free Software
- *  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
+/* 30/07/2026 - TCC 0.9.23 */
+
 /* number of available registers */
-#define NB_REGS             4
+#define NB_REGS      4
 
 /* a register can belong to several classes. The classes must be
    sorted from more general to more precise (see gv2() code which does
@@ -70,14 +72,18 @@ int reg_classes[NB_REGS] = {
 /* maximum alignment (for aligned attribute support) */
 #define MAX_ALIGN     8
 
-/* relocation type for 32 bit data relocation */
-#define R_DATA_32 R_386_32
+/******************************************************/
+/* ELF defines */
 
-/* function call context */
-typedef struct GFuncContext {
-    int args_size;
-    int func_call; /* func call type (FUNC_STDCALL or FUNC_CDECL) */
-} GFuncContext;
+#define EM_TCC_TARGET EM_386
+
+/* relocation type for 32 bit data relocation */
+#define R_DATA_32   R_386_32
+#define R_JMP_SLOT  R_386_JMP_SLOT
+#define R_COPY      R_386_COPY
+
+#define ELF_START_ADDR 0x08048000
+#define ELF_PAGE_SIZE  0x1000
 
 /******************************************************/
 
@@ -96,11 +102,11 @@ void g(int c)
     ind = ind1;
 }
 
-void o(int c)
+void o(unsigned int c)
 {
     while (c) {
         g(c);
-        c = c / 256;
+        c = c >> 8;
     }
 }
 
@@ -268,7 +274,7 @@ void store(int r, SValue *v)
     } else {
         if (bt == VT_SHORT)
             o(0x66);
-        if (bt == VT_BYTE)
+        if (bt == VT_BYTE || bt == VT_BOOL)
             o(0x88);
         else
             o(0x89);
@@ -280,65 +286,6 @@ void store(int r, SValue *v)
     } else if (fr != r) {
         o(0xc0 + fr + r * 8); /* mov r, fr */
     }
-}
-
-/* start function call and return function call context */
-void gfunc_start(GFuncContext *c, int func_call)
-{
-    c->args_size = 0;
-    c->func_call = func_call;
-}
-
-/* push function parameter which is in (vtop->t, vtop->c). Stack entry
-   is then popped. */
-void gfunc_param(GFuncContext *c)
-{
-    int size, align, r;
-
-    if ((vtop->type.t & VT_BTYPE) == VT_STRUCT) {
-        size = type_size(&vtop->type, &align);
-        /* align to stack align size */
-        size = (size + 3) & ~3;
-        /* allocate the necessary size on stack */
-        oad(0xec81, size); /* sub $xxx, %esp */
-        /* generate structure store */
-        r = get_reg(RC_INT);
-        o(0x89); /* mov %esp, r */
-        o(0xe0 + r);
-        vset(&vtop->type, r | VT_LVAL, 0);
-        vswap();
-        vstore();
-        c->args_size += size;
-    } else if (is_float(vtop->type.t)) {
-        gv(RC_FLOAT); /* only one float register */
-        if ((vtop->type.t & VT_BTYPE) == VT_FLOAT)
-            size = 4;
-        else if ((vtop->type.t & VT_BTYPE) == VT_DOUBLE)
-            size = 8;
-        else
-            size = 12;
-        oad(0xec81, size); /* sub $xxx, %esp */
-        if (size == 12)
-            o(0x7cdb);
-        else
-            o(0x5cd9 + size - 4); /* fstp[s|l] 0(%esp) */
-        g(0x24);
-        g(0x00);
-        c->args_size += size;
-    } else {
-        /* simple type (currently always same size) */
-        /* XXX: implicit cast ? */
-        r = gv(RC_INT);
-        if ((vtop->type.t & VT_BTYPE) == VT_LLONG) {
-            size = 8;
-            o(0x50 + vtop->r2); /* push r */
-        } else {
-            size = 4;
-        }
-        o(0x50 + r); /* push r */
-        c->args_size += size;
-    }
-    vtop--;
 }
 
 static void gadd_sp(int val)
@@ -375,38 +322,163 @@ static void gcall_or_jmp(int is_jmp)
     }
 }
 
-/* generate function call with address in (vtop->t, vtop->c) and free function
-   context. Stack entry is popped */
-void gfunc_call(GFuncContext *c)
+static uint8_t fastcall_regs[3] = { TREG_EAX, TREG_EDX, TREG_ECX };
+
+/* Generate function call. The function address is pushed first, then
+   all the parameters in call order. This functions pops all the
+   parameters and the function address. */
+void gfunc_call(int nb_args)
 {
+    int size, align, r, args_size, i, func_call;
+    Sym *func_sym;
+    
+    args_size = 0;
+    for(i = 0;i < nb_args; i++) {
+        if ((vtop->type.t & VT_BTYPE) == VT_STRUCT) {
+            size = type_size(&vtop->type, &align);
+            /* align to stack align size */
+            size = (size + 3) & ~3;
+            /* allocate the necessary size on stack */
+            oad(0xec81, size); /* sub $xxx, %esp */
+            /* generate structure store */
+            r = get_reg(RC_INT);
+            o(0x89); /* mov %esp, r */
+            o(0xe0 + r);
+            vset(&vtop->type, r | VT_LVAL, 0);
+            vswap();
+            vstore();
+            args_size += size;
+        } else if (is_float(vtop->type.t)) {
+            gv(RC_FLOAT); /* only one float register */
+            if ((vtop->type.t & VT_BTYPE) == VT_FLOAT)
+                size = 4;
+            else if ((vtop->type.t & VT_BTYPE) == VT_DOUBLE)
+                size = 8;
+            else
+                size = 12;
+            oad(0xec81, size); /* sub $xxx, %esp */
+            if (size == 12)
+                o(0x7cdb);
+            else
+                o(0x5cd9 + size - 4); /* fstp[s|l] 0(%esp) */
+            g(0x24);
+            g(0x00);
+            args_size += size;
+        } else {
+            /* simple type (currently always same size) */
+            /* XXX: implicit cast ? */
+            r = gv(RC_INT);
+            if ((vtop->type.t & VT_BTYPE) == VT_LLONG) {
+                size = 8;
+                o(0x50 + vtop->r2); /* push r */
+            } else {
+                size = 4;
+            }
+            o(0x50 + r); /* push r */
+            args_size += size;
+        }
+        vtop--;
+    }
+    save_regs(0); /* save used temporary registers */
+    func_sym = vtop->type.ref;
+    func_call = func_sym->r;
+    /* fast call case */
+    if (func_call >= FUNC_FASTCALL1 && func_call <= FUNC_FASTCALL3) {
+        int fastcall_nb_regs;
+        fastcall_nb_regs = func_call - FUNC_FASTCALL1 + 1;
+        for(i = 0;i < fastcall_nb_regs; i++) {
+            if (args_size <= 0)
+                break;
+            o(0x58 + fastcall_regs[i]); /* pop r */
+            /* XXX: incorrect for struct/floats */
+            args_size -= 4;
+        }
+    }
+    /* 30/07/2026 - TCC 0.9.24 - i386-gen.c */
+    /* fast call case */
+    // if ((func_call >= FUNC_FASTCALL1 && func_call <= FUNC_FASTCALL3) ||
+    //    func_call == FUNC_FASTCALLW) {
+    //    int fastcall_nb_regs;
+    //    uint8_t *fastcall_regs_ptr;
+    //    if (func_call == FUNC_FASTCALLW) {
+    //        fastcall_regs_ptr = fastcallw_regs;
+    //        fastcall_nb_regs = 2;
+    //    } else {
+    //        fastcall_regs_ptr = fastcall_regs;
+    //        fastcall_nb_regs = func_call - FUNC_FASTCALL1 + 1;
+    //    }
+    //    for(i = 0;i < fastcall_nb_regs; i++) {
+    //        if (args_size <= 0)
+    //            break;
+    //        o(0x58 + fastcall_regs_ptr[i]); /* pop r */
+    //        /* XXX: incorrect for struct/floats */
+    //        args_size -= 4;
+    //    }
+    // }
+    /* ...... */
     gcall_or_jmp(0);
-    if (c->args_size && c->func_call == FUNC_CDECL)
-        gadd_sp(c->args_size);
+    if (args_size && func_sym->r != FUNC_STDCALL)
+        gadd_sp(args_size);
     vtop--;
 }
+
+#ifdef TCC_TARGET_PE
+#define FUNC_PROLOG_SIZE 10
+#else
+#define FUNC_PROLOG_SIZE 9
+#endif
 
 /* generate function prolog of type 't' */
 void gfunc_prolog(CType *func_type)
 {
-    int addr, align, size, func_call;
+    int addr, align, size, func_call, fastcall_nb_regs;
+    int param_index, param_addr;
     Sym *sym;
     CType *type;
 
     sym = func_type->ref;
     func_call = sym->r;
     addr = 8;
+    loc = 0;
+    if (func_call >= FUNC_FASTCALL1 && func_call <= FUNC_FASTCALL3) {
+        fastcall_nb_regs = func_call - FUNC_FASTCALL1 + 1;
+    } else {
+        fastcall_nb_regs = 0;
+    }
+
+    /* 30/07/2026 - TCC 0.9.24 - i386-gen.c */
+    // sym = func_type->ref;
+    // func_call = FUNC_CALL(sym->r);
+    // addr = 8;
+    // loc = 0;
+    // if (func_call >= FUNC_FASTCALL1 && func_call <= FUNC_FASTCALL3) {
+    //    fastcall_nb_regs = func_call - FUNC_FASTCALL1 + 1;
+    //    fastcall_regs_ptr = fastcall_regs;
+    // } else if (func_call == FUNC_FASTCALLW) {
+    //    fastcall_nb_regs = 2;
+    //    fastcall_regs_ptr = fastcallw_regs;
+    // } else {
+    //    fastcall_nb_regs = 0;
+    //    fastcall_regs_ptr = NULL;
+    // }
+    /* ....... */
+
+    param_index = 0;
+
+    ind += FUNC_PROLOG_SIZE;
+    func_sub_sp_offset = ind;
     /* if the function returns a structure, then add an
        implicit pointer parameter */
     func_vt = sym->type;
     if ((func_vt.t & VT_BTYPE) == VT_STRUCT) {
+        /* XXX: fastcall case ? */
         func_vc = addr;
         addr += 4;
+        param_index++;
     }
     /* define parameters */
     while ((sym = sym->next) != NULL) {
         type = &sym->type;
-        sym_push(sym->v & ~SYM_FIELD, type,
-                 VT_LOCAL | VT_LVAL, addr);
         size = type_size(type, &align);
         size = (size + 3) & ~3;
 #ifdef FUNC_STRUCT_PARAM_AS_PTR
@@ -415,14 +487,25 @@ void gfunc_prolog(CType *func_type)
             size = 4;
         }
 #endif
-        addr += size;
+        if (param_index < fastcall_nb_regs) {
+            /* save FASTCALL register */
+            loc -= 4;
+            o(0x89);     /* movl */
+            gen_modrm(fastcall_regs[param_index], VT_LOCAL, NULL, loc);
+            param_addr = loc;
+        } else {
+            param_addr = addr;
+            addr += size;
+        }
+        sym_push(sym->v & ~SYM_FIELD, type,
+                 VT_LOCAL | VT_LVAL, param_addr);
+        param_index++;
     }
     func_ret_sub = 0;
     /* pascal type call ? */
     if (func_call == FUNC_STDCALL)
         func_ret_sub = addr - 8;
-    o(0xe58955); /* push   %ebp, mov    %esp, %ebp */
-    func_sub_sp_offset = oad(0xec81, 0); /* sub $xxx, %esp */
+
     /* leave some room for bound checking code */
     if (do_bounds_check) {
         oad(0xb8, 0); /* lbound section pointer */
@@ -434,6 +517,8 @@ void gfunc_prolog(CType *func_type)
 /* generate function epilog */
 void gfunc_epilog(void)
 {
+    int v, saved_ind;
+
 #ifdef CONFIG_TCC_BCHECK
     if (do_bounds_check && func_bound_offset != lbounds_section->data_offset) {
         int saved_ind;
@@ -444,7 +529,7 @@ void gfunc_epilog(void)
         *bounds_ptr = 0;
         /* generate bound local allocation */
         saved_ind = ind;
-        ind = func_sub_sp_offset + 4;
+        ind = func_sub_sp_offset;
         sym_data = get_sym_ref(&char_pointer_type, lbounds_section, 
                                func_bound_offset, lbounds_section->data_offset);
         greloc(cur_text_section, sym_data,
@@ -476,7 +561,27 @@ void gfunc_epilog(void)
         g(func_ret_sub >> 8);
     }
     /* align local size to word & save local variables */
-    *(int *)(cur_text_section->data + func_sub_sp_offset) = (-loc + 3) & -4; 
+    
+    v = (-loc + 3) & -4; 
+    saved_ind = ind;
+    ind = func_sub_sp_offset - FUNC_PROLOG_SIZE;
+#ifdef TCC_TARGET_PE
+    if (v >= 4096) {
+        Sym *sym = external_global_sym(TOK___chkstk, &func_old_type, 0);
+        oad(0xb8, v); /* mov stacksize, %eax */
+        oad(0xe8, -4); /* call __chkstk, (does the stackframe too) */
+        greloc(cur_text_section, sym, ind-4, R_386_PC32);
+    } else
+#endif
+    {
+        o(0xe58955);  /* push %ebp, mov %esp, %ebp */
+        o(0xec81);  /* sub esp, stacksize */
+        gen_le32(v);
+#if FUNC_PROLOG_SIZE == 10
+        o(0x90);  /* adjust to FUNC_PROLOG_SIZE */
+#endif
+    }
+    ind = saved_ind;
 }
 
 /* generate a jump to a label */

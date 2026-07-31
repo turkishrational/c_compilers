@@ -1,3 +1,68 @@
+version 0.9.23:
+
+- initial PE executable format for windows version (grischka)
+- '#pragma pack' support (grischka)
+- '#include_next' support (Bernhard Fischer)
+- ignore '-pipe' option
+- added -f[no-]leading-underscore
+- preprocessor function macro parsing fix (grischka)
+
+version 0.9.22:
+
+- simple memory optimisations: kernel compilation is 30% faster
+- linker symbol definitions fixes
+- gcc 3.4 fixes
+- fixed value stack full error
+- 'packed' attribute support for variables and structure fields
+- ignore 'const' and 'volatile' in function prototypes
+- allow '_Bool' in bit fields
+
+version 0.9.21:
+
+- ARM target support (Daniel Glöckner)
+- added '-funsigned-char, '-fsigned-char' and
+  '-Wimplicit-function-declaration'
+- fixed assignment of const struct in struct
+- line comment fix (reported by Bertram Felgenhauer)
+- initial TMS320C67xx target support (TK)
+- win32 configure
+- regparm() attribute
+- many built-in assembler fixes
+- added '.org', '.fill' and '.previous' assembler directives
+- '-fno-common' option
+- '-Ttext' linker option
+- section alignment fixes
+- bit fields fixes
+- do not generate code for unused inline functions
+- '-oformat' linker option. 
+- added 'binary' output format.
+
+version 0.9.20:
+
+- added '-w' option
+- added '.gnu.linkonce' ELF sections support
+- fixed libc linking when running in memory (avoid 'stat' function
+  errors).
+- extended '-run' option to be able to give several arguments to a C
+  script.
+
+version 0.9.19:
+
+- "alacarte" linking (Dave Long)
+- simpler function call
+- more strict type checks
+- added 'const' and 'volatile' support and associated warnings
+- added -Werror, -Wunsupported, -Wwrite-strings, -Wall.
+- added __builtin_types_compatible_p() and __builtin_constant_p()
+- chars support in assembler (Dave Long)
+- .string, .globl, .section, .text, .data and .bss asm directive
+  support (Dave Long)
+- man page generated from tcc-doc.texi
+- fixed macro argument substitution
+- fixed zero argument macro parsing
+- changed license to LGPL
+- added -rdynamic option support
+
 version 0.9.18:
 
 - header fix (time.h)

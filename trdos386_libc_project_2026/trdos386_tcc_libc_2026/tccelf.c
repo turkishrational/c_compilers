@@ -10,7 +10,7 @@
  *
  *  This program is distributed in the hope that it will be useful,
  *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  *  GNU General Public License for more details.
  *
  *  You should have received a copy of the GNU General Public License
@@ -18,12 +18,14 @@
  *  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
 
+/* 29/07/2026 */
+/* 28/07/2026 - TCC.PRG 0.9.23 */
 /* 22/07/2026 */
 
 /* 09/07/2026 */
 /* 08/07/2026 - Google AI */
 /* =========================================================================
-   TRDOS-386 SAF FLAT ELF COMPONENT LINKER SUBSYSTEM (tccelf.c - PART 1)
+   TRDOS-386 SAF FLAT ELF COMPONENT LINKER SUBSYSTEM (tccelf.c)
    ========================================================================= */
 
 /* Append a dynamic string into the target ELF string table section and return its relative offset */
@@ -42,16 +44,16 @@ static int put_elf_str(Section *s, const char *sym)
 /* Calculate standard System V ELF hash tracking metrics for a given identifier string literal */
 static unsigned long elf_hash(const unsigned char *name)
 {
-    unsigned long h = 0, g;
+   unsigned long h = 0, g;
     
-    while (*name) {
-        h = (h << 4) + *name++;
-        g = h & 0xf0000000;
-        if (g)
-            h ^= g >> 24;
-        h &= ~g;
-    }
-    return h;
+   while (*name) {
+      h = (h << 4) + *name++;
+      g = h & 0xf0000000;
+      if (g)
+          h ^= g >> 24;
+      h &= ~g;
+  }
+  return h;
 }
 
 /* Reconstruct and re-index the internal layout hashing table for section 's' to optimize symbol lookup speeds */
@@ -72,6 +74,10 @@ static void rebuild_hash(Section *s, unsigned int nb_buckets)
     hash = ptr;
     memset(hash, 0, (nb_buckets + 1) * sizeof(int));
     ptr += nb_buckets + 1;
+
+    /* 22/07/2026 - TCC 0.9.27 only */
+    // if (!nb_buckets)
+    //   nb_buckets = ((int*)s->hash->data)[0];
 
     sym = (Elf32_Sym *)s->data + 1;
     for(sym_index = 1; sym_index < nb_syms; sym_index++) {
@@ -162,18 +168,19 @@ static int find_elf_sym(Section *s, const char *name)
 }
 
 /* Public Linker API: Retrieve the absolute runtime linear address associated with a registered symbol identifier */
-void *tcc_get_symbol(TCCState *s, const char *name)
-{
-    int sym_index;
-    Elf32_Sym *sym;
-    
-    sym_index = find_elf_sym(symtab_section, name);
-    if (!sym_index)
-        return 0;
-        
-    sym = &((Elf32_Sym *)symtab_section->data)[sym_index];
-    return (void *)sym->st_value;
-}
+/* 22/07/2026 */
+// void *tcc_get_symbol(TCCState *s, const char *name)
+// {
+//  int sym_index;
+//  Elf32_Sym *sym;
+//    
+//  sym_index = find_elf_sym(symtab_section, name);
+//  if (!sym_index)
+//      return 0;
+//        
+//  sym = &((Elf32_Sym *)symtab_section->data)[sym_index];
+//  return (void *)sym->st_value;
+// }
 
 /* Add an ELF symbol: Check if it is already defined in dictionary maps and patch it. Return symbol index.
    Accepts SHN_UNDEF section definitions smoothly for unresolved forward tracking references. */
@@ -243,66 +250,67 @@ static void put_elf_reloc(Section *symtab, Section *s, unsigned long offset, int
 }
 
 /* STABS debug interpretation infrastructure safely siphoned away to shield pure flat integrity */
-
-/* Sort ELF symbols putting local symbols below global and weak ones to fulfill ELF standard specs.
-   Adjusts and updates all related relocation offset tables concurrently. */
-static void sort_syms(TCCState *s1, Section *s)
-{
-    int *old_to_new_syms;
-    Elf32_Sym *new_syms;
-    int nb_syms, i;
-    Elf32_Sym *p, *q;
-    Elf32_Rel *rel, *rel_end;
-    Section *sr;
-    int type, sym_index;
-
-    nb_syms = s->data_offset / sizeof(Elf32_Sym);
-    new_syms = tcc_malloc(nb_syms * sizeof(Elf32_Sym));
-    old_to_new_syms = tcc_malloc(nb_syms * sizeof(int));
-
-    /* Execute the primary pass filtering and packing local symbol descriptors */
-    p = (Elf32_Sym *)s->data;
-    q = new_syms;
-    for(i = 0; i < nb_syms; i++) {
-        if (ELF32_ST_BIND(p->st_info) == STB_LOCAL) {
-            old_to_new_syms[i] = q - new_syms;
-            *q++ = *p;
-        }
-        p++;
-    }
-    /* Commit the local symbols counter metric directly into the active section header description */
-    s->sh_info = q - new_syms;
-
-    /* Execute the secondary pass packing global and weak symbol descriptors consecutively */
-    p = (Elf32_Sym *)s->data;
-    for(i = 0; i < nb_syms; i++) {
-        if (ELF32_ST_BIND(p->st_info) != STB_LOCAL) {
-            old_to_new_syms[i] = q - new_syms;
-            *q++ = *p;
-        }
-        p++;
-    }
-    
-    /* Mirror the sorted symbol layout tracking frames back onto the original memory chunk */
-    memcpy(s->data, new_syms, nb_syms * sizeof(Elf32_Sym));
-    tcc_free(new_syms);
-
-    /* Enforce updates mapping relocation tables to align with newly updated symbol index pointers */
-    for(i = 1; i < s1->nb_sections; i++) {
-        sr = s1->sections[i];
-        if (sr->sh_type == SHT_REL && sr->link == s) {
-            rel_end = (Elf32_Rel *)(sr->data + sr->data_offset);
-            for(rel = (Elf32_Rel *)sr->data; rel < rel_end; rel++) {
-                sym_index = ELF32_R_SYM(rel->r_info);
-                type = ELF32_R_TYPE(rel->r_info);
-                sym_index = old_to_new_syms[sym_index];
-                rel->r_info = ELF32_R_INFO(sym_index, type);
-            }
-        }
-    }
-
-    tcc_free(old_to_new_syms);
-}
+/* 22/07/2026 */
+//
+// /* Sort ELF symbols putting local symbols below global and weak ones to fulfill ELF standard specs.
+//   Adjusts and updates all related relocation offset tables concurrently. */
+// static void sort_syms(TCCState *s1, Section *s)
+// {
+//   int *old_to_new_syms;
+//   Elf32_Sym *new_syms;
+//   int nb_syms, i;
+//   Elf32_Sym *p, *q;
+//   Elf32_Rel *rel, *rel_end;
+//   Section *sr;
+//   int type, sym_index;
+// 
+//  nb_syms = s->data_offset / sizeof(Elf32_Sym);
+//  new_syms = tcc_malloc(nb_syms * sizeof(Elf32_Sym));
+//  old_to_new_syms = tcc_malloc(nb_syms * sizeof(int));
+//
+//  /* Execute the primary pass filtering and packing local symbol descriptors */
+//  p = (Elf32_Sym *)s->data;
+//  q = new_syms;
+//  for(i = 0; i < nb_syms; i++) {
+//     if (ELF32_ST_BIND(p->st_info) == STB_LOCAL) {
+//         old_to_new_syms[i] = q - new_syms;
+//         *q++ = *p;
+//     }
+//     p++;
+// }
+// /* Commit the local symbols counter metric directly into the active section header description */
+// s->sh_info = q - new_syms;
+//
+// /* Execute the secondary pass packing global and weak symbol descriptors consecutively */
+// p = (Elf32_Sym *)s->data;
+// for(i = 0; i < nb_syms; i++) {
+//     if (ELF32_ST_BIND(p->st_info) != STB_LOCAL) {
+//        old_to_new_syms[i] = q - new_syms;
+//        *q++ = *p;
+//     }
+//     p++;
+// }
+//    
+//  /* Mirror the sorted symbol layout tracking frames back onto the original memory chunk */
+//  memcpy(s->data, new_syms, nb_syms * sizeof(Elf32_Sym));
+//  tcc_free(new_syms);
+//
+//  /* Enforce updates mapping relocation tables to align with newly updated symbol index pointers */
+//  for(i = 1; i < s1->nb_sections; i++) {
+//      sr = s1->sections[i];
+//      if (sr->sh_type == SHT_REL && sr->link == s) {
+//          rel_end = (Elf32_Rel *)(sr->data + sr->data_offset);
+//          for(rel = (Elf32_Rel *)sr->data; rel < rel_end; rel++) {
+//              sym_index = ELF32_R_SYM(rel->r_info);
+//              type = ELF32_R_TYPE(rel->r_info);
+//              sym_index = old_to_new_syms[sym_index];
+//              rel->r_info = ELF32_R_INFO(sym_index, type);
+//          }
+//      }
+//  }
+//    
+//  tcc_free(old_to_new_syms);
+// }
 
 /* Relocate uninitialized global common symbols allocating their footprints straight inside .bss section */
 static void relocate_common_syms(void)
@@ -326,11 +334,12 @@ static void relocate_common_syms(void)
 }
 
 /* Resolve a runtime external symbol reference map falling back directly to stubbed address markers */
-static unsigned long resolve_sym(TCCState *s1, const char *sym)
-{
-    /* Dynamic object dlsym linking structures siphoned away to shield absolute pure flat binary integrity */
-    return 0;
-}
+/* 22/07/2026 */
+// static unsigned long resolve_sym(TCCState *s1, const char *sym)
+// {
+//   /* Dynamic object dlsym linking structures siphoned away to shield absolute pure flat binary integrity */
+//   return 0;
+// }
 
 /* Traverse and evaluate layout symbols computing precise linear destination address locations */
 void relocate_syms(TCCState *s1, int do_run)
@@ -352,7 +361,9 @@ void relocate_syms(TCCState *s1, int do_run)
                 if (sym->st_shndx == SHN_UNDEF) {
                     name = s->link->data + sym->st_name;
                     /* Query current dictionary to verify symbol existence before fallback processing loops */
-                    sym->st_value = resolve_sym(s1, name);
+                    // sym->st_value = resolve_sym(s1, name);
+		    /* 22/07/2026 */
+                       sym->st_value = 0;
                 } else if (sym->st_shndx == SHN_COMMON) {
                     /* Common data block layouts completely handled and processed by the primary allocator loops */
                 } else if (sym->st_shndx < SHN_LORESERVE) {
@@ -410,32 +421,35 @@ static void relocate_section(TCCState *s1, Section *s)
 }
 
 /* Relocate the primary base offsets inside the target relocation table section descriptor 'sr' */
-static void relocate_rel(TCCState *s1, Section *sr)
-{
-    Section *s;
-    Elf32_Rel *rel, *rel_end;
-    
-    s = s1->sections[sr->sh_info];
-    rel_end = (Elf32_Rel *)(sr->data + sr->data_offset);
-    for(rel = (Elf32_Rel *)sr->data; rel < rel_end; rel++) {
-        rel->r_offset += s->sh_addr;
-    }
-}
+/* 22/07/2026 */
+// static void relocate_rel(TCCState *s1, Section *sr)
+// {
+//   Section *s;
+//   Elf32_Rel *rel, *rel_end;
+//    
+//   s = s1->sections[sr->sh_info];
+//   rel_end = (Elf32_Rel *)(sr->data + sr->data_offset);
+//   for(rel = (Elf32_Rel *)sr->data; rel < rel_end; rel++) {
+//       rel->r_offset += s->sh_addr;
+//   }
+// }
 
 /* Write a 32-bit unsigned integer value safely into target byte arrays enforcing low-endian rules */
-static void put32(unsigned char *p, uint32_t val)
-{
-    p[0] = val;
-    p[1] = val >> 8;
-    p[2] = val >> 16;
-    p[3] = val >> 24;
-}
+/* 22/07/2026 */
+// static void put32(unsigned char *p, uint32_t val)
+// {
+//  p[0] = val;
+//  p[1] = val >> 8;
+//  p[2] = val >> 16;
+//  p[3] = val >> 24;
+// }
 
 /* Extract and decode a 32-bit unsigned integer value from target low-endian byte arrays safely */
-static uint32_t get32(unsigned char *p)
-{
-    return p[0] | (p[1] << 8) | (p[2] << 16) | (p[3] << 24);
-}
+/* 22/07/2026 */
+// static uint32_t get32(unsigned char *p)
+// {
+//   return p[0] | (p[1] << 8) | (p[2] << 16) | (p[3] << 24);
+// }
 
 /* Dynamic linkage structural generators (build_got, put_got_entry, build_got_entries) 
    completely siphoned away to adapt the pipeline strictly for pure flat executable binaries */
@@ -472,7 +486,9 @@ static Section *new_symtab(TCCState *s1,
     return symtab;
 }
 
-static int trdos_runtime_injected = 0;
+// static int trdos_runtime_injected = 0;
+/* 28/07/2026 */
+static int libc_linked = 0;
 
 //
 // /* 17/07/2026 */
@@ -507,7 +523,9 @@ static int trdos_runtime_injected = 0;
 static void tcc_add_crt0_flat(TCCState *s1)
 {
     char buf[1024];
-    if (trdos_runtime_injected != 0) return; 
+
+    /* 29/07/2026 */
+    // if (trdos_runtime_injected != 0) return; 
     
     /* Yerel kütüphane yolunu tanımla */
     tcc_add_library_path(s1, "./lib");
@@ -521,7 +539,8 @@ static void tcc_add_crt0_flat(TCCState *s1)
 static void tcc_link_libc_flat(TCCState *s1)
 {
     /* Sadece bir kez çağrılmasını garanti altına almak için statik bayrak */
-    static int libc_linked = 0;
+    /* 28/07/2026 */
+    // static int libc_linked = 0;
     if (libc_linked) return;
     libc_linked = 1;
 
@@ -529,8 +548,9 @@ static void tcc_link_libc_flat(TCCState *s1)
     tcc_add_library(s1, "c");
 }
 
-#define ELF_START_ADDR 0x00000000 /* Aligned straight to absolute base address 0x0 for TRDOS 386 Saf Flat PRG format */
-#define ELF_PAGE_SIZE  0x1000
+/* 22/07/2026 */
+// #define ELF_START_ADDR 0x00000000 /* Aligned straight to absolute base address 0x0 for TRDOS 386 Saf Flat PRG format */
+// #define ELF_PAGE_SIZE  0x1000
 
 /* Allocate memory and load raw binary section payload blocks directly out of an object file descriptor */
 static void *load_data(int fd, unsigned long file_offset, unsigned long size)
@@ -575,7 +595,8 @@ static int tcc_load_object_file(TCCState *s1, int fd, unsigned long file_offset)
         ehdr.e_ident[2] != ELFMAG2 ||
         ehdr.e_ident[3] != ELFMAG3)
         goto fail1;
-        
+    
+    /* test if object file */
     if (ehdr.e_type != ET_REL)
         goto fail1;
         
@@ -904,6 +925,7 @@ restore_fd_and_exit:
     lseek(fd, original_fd_pos, 0); /* SEEK_SET */
     return needed;
 }
+
 /* 17/07/2026 - Google AI */
 /* =========================================================================
    TRDOS 386 FLAT LINKER - NATIVE BASE-10 STR-TO-LONG CONVERTER
@@ -1064,6 +1086,7 @@ static int tcc_load_archive(TCCState *s1, int fd)
 #define LD_TOK_EOF  (-1)
 
 /* Extract and return the next valid token snapshot found inside the active linker script stream */
+/* 22/07/2026 - TCC 0.9.18-0.9.23 */
 static int ld_next(TCCState *s1, char *name, int name_size)
 {
     int c;
@@ -1122,10 +1145,16 @@ static int ld_next(TCCState *s1, char *name, int name_size)
         inp();
         break;
     }
+#if 0
+    printf("tok=%c %d\n", c, c);
+    if (c == LD_TOK_NAME)
+        printf("  name=%s\n", name);
+#endif
     return c;
 }
 
 /* Parse and evaluate a minimal subset of GNU ld linker script keywords (like INPUT or GROUP symbols) */
+/* 22/07/2026 - TCC 0.9.23 */
 static int tcc_load_ldscript(TCCState *s1)
 {
     char cmd[64];
@@ -1140,8 +1169,8 @@ static int tcc_load_ldscript(TCCState *s1)
             return 0;
         else if (t != LD_TOK_NAME)
             return -1;
-            
-        if (!strcmp(cmd, "INPUT") || !strcmp(cmd, "GROUP")) {
+        if (!strcmp(cmd, "INPUT") ||
+            !strcmp(cmd, "GROUP")) {
             t = ld_next(s1, cmd, sizeof(cmd));
             if (t != '(')
                 expect("(");
@@ -1160,6 +1189,21 @@ static int tcc_load_ldscript(TCCState *s1)
                 t = ld_next(s1, filename, sizeof(filename));
                 if (t == ',') {
                     t = ld_next(s1, filename, sizeof(filename));
+                }
+            }
+        } else if (!strcmp(cmd, "OUTPUT_FORMAT") ||
+                   !strcmp(cmd, "TARGET")) {
+            /* ignore some commands */
+            t = ld_next(s1, cmd, sizeof(cmd));
+            if (t != '(')
+                expect("(");
+            for(;;) {
+                t = ld_next(s1, filename, sizeof(filename));
+                if (t == LD_TOK_EOF) {
+                    error_noabort("unexpected end of file");
+                    return -1;
+                } else if (t == ')') {
+                    break;
                 }
             }
         } else {

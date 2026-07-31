@@ -1,3 +1,6 @@
+/* 30/07/2026 */
+/* 23/07/2026 - TCC 0.9.23 */
+
 /* keywords */
      DEF(TOK_INT, "int")
      DEF(TOK_VOID, "void")
@@ -64,6 +67,7 @@
 /* preprocessor only */
      DEF(TOK_DEFINE, "define")
      DEF(TOK_INCLUDE, "include")
+     DEF(TOK_INCLUDE_NEXT, "include_next")
      DEF(TOK_IFDEF, "ifdef")
      DEF(TOK_IFNDEF, "ifndef")
      DEF(TOK_ELIF, "elif")
@@ -90,6 +94,8 @@
      DEF(TOK_SECTION2, "__section__")
      DEF(TOK_ALIGNED1, "aligned")
      DEF(TOK_ALIGNED2, "__aligned__")
+     DEF(TOK_PACKED1, "packed")
+     DEF(TOK_PACKED2, "__packed__")
      DEF(TOK_UNUSED1, "unused")
      DEF(TOK_UNUSED2, "__unused__")
      DEF(TOK_CDECL1, "cdecl")
@@ -98,8 +104,26 @@
      DEF(TOK_STDCALL1, "stdcall")
      DEF(TOK_STDCALL2, "__stdcall")
      DEF(TOK_STDCALL3, "__stdcall__")
+     /* 30/07/2026 - TCC 0.9.24 - tcctok.h */
+     DEF(TOK_FASTCALL1, "fastcall")
+     DEF(TOK_FASTCALL2, "__fastcall")
+     DEF(TOK_FASTCALL3, "__fastcall__")
+     /* ...... */
+     DEF(TOK_DLLEXPORT, "dllexport")
      DEF(TOK_NORETURN1, "noreturn")
      DEF(TOK_NORETURN2, "__noreturn__")
+     DEF(TOK_builtin_types_compatible_p, "__builtin_types_compatible_p")
+     DEF(TOK_builtin_constant_p, "__builtin_constant_p")
+     DEF(TOK_REGPARM1, "regparm")
+     DEF(TOK_REGPARM2, "__regparm__")
+
+/* pragma */
+     DEF(TOK_pack, "pack")
+#if !defined(TCC_TARGET_I386)
+     /* already defined for assembler */
+     DEF(TOK_ASM_push, "push")
+     DEF(TOK_ASM_pop, "pop")
+#endif
 
 /* builtin functions or variables */
      DEF(TOK_memcpy, "memcpy")
@@ -109,9 +133,37 @@
      DEF(TOK___moddi3, "__moddi3")
      DEF(TOK___udivdi3, "__udivdi3")
      DEF(TOK___umoddi3, "__umoddi3")
+#if defined(TCC_TARGET_ARM)
+     DEF(TOK___divsi3, "__divsi3")
+     DEF(TOK___modsi3, "__modsi3")
+     DEF(TOK___udivsi3, "__udivsi3")
+     DEF(TOK___umodsi3, "__umodsi3")
+     DEF(TOK___sardi3, "__ashrdi3")
+     DEF(TOK___shrdi3, "__lshrdi3")
+     DEF(TOK___shldi3, "__ashldi3")
+     DEF(TOK___slltold, "__slltold")
+     DEF(TOK___fixunssfsi, "__fixunssfsi")
+     DEF(TOK___fixunsdfsi, "__fixunsdfsi")
+     DEF(TOK___fixunsxfsi, "__fixunsxfsi")
+     DEF(TOK___fixsfdi, "__fixsfdi")
+     DEF(TOK___fixdfdi, "__fixdfdi")
+     DEF(TOK___fixxfdi, "__fixxfdi")
+#elif defined(TCC_TARGET_C67)
+     DEF(TOK__divi, "_divi")
+     DEF(TOK__divu, "_divu")
+     DEF(TOK__divf, "_divf")
+     DEF(TOK__divd, "_divd")
+     DEF(TOK__remi, "_remi")
+     DEF(TOK__remu, "_remu")
      DEF(TOK___sardi3, "__sardi3")
      DEF(TOK___shrdi3, "__shrdi3")
      DEF(TOK___shldi3, "__shldi3")
+#else
+     /* XXX: same names on i386 ? */
+     DEF(TOK___sardi3, "__sardi3")
+     DEF(TOK___shrdi3, "__shrdi3")
+     DEF(TOK___shldi3, "__shldi3")
+#endif
      DEF(TOK___tcc_int_fpu_control, "__tcc_int_fpu_control")
      DEF(TOK___tcc_fpu_control, "__tcc_fpu_control")
      DEF(TOK___ulltof, "__ulltof")
@@ -120,6 +172,7 @@
      DEF(TOK___fixunssfdi, "__fixunssfdi")
      DEF(TOK___fixunsdfdi, "__fixunsdfdi")
      DEF(TOK___fixunsxfdi, "__fixunsxfdi")
+     DEF(TOK___chkstk, "__chkstk")
 
 /* bound checking symbols */
 #ifdef CONFIG_TCC_BCHECK
@@ -142,12 +195,24 @@
      DEF(TOK_strcpy, "strcpy")
 #endif
 
-/* Tiny Assembler for x86 */
+/* Tiny Assembler */
 
  DEF_ASM(byte)
  DEF_ASM(align)
  DEF_ASM(skip)
  DEF_ASM(space)
+ DEF_ASM(string)
+ DEF_ASM(asciz)
+ DEF_ASM(ascii)
+ DEF_ASM(globl)
+ DEF_ASM(global)
+ DEF_ASM(text)
+ DEF_ASM(data)
+ DEF_ASM(bss)
+ DEF_ASM(previous)
+ DEF_ASM(fill)
+ DEF_ASM(org)
+ DEF_ASM(quad)
 
 #ifdef TCC_TARGET_I386
 

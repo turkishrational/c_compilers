@@ -11,6 +11,7 @@ endif
 CFLAGS_P=$(CFLAGS) -pg -static -DCONFIG_TCC_STATIC
 LIBS_P=
 
+CFLAGS+=-mpreferred-stack-boundary=2
 ifeq ($(GCC_MAJOR),2)
 CFLAGS+=-m386 -malign-functions=0
 else
@@ -22,16 +23,31 @@ INSTALL=install
 
 ifdef CONFIG_WIN32
 PROGS=tcc$(EXESUF)
+ifdef CONFIG_CROSS
+PROGS+=c67-tcc$(EXESUF) arm-tcc$(EXESUF)
+endif
+PROGS+=tiny_impdef$(EXESUF)
+else
 ifeq ($(ARCH),i386)
 PROGS=tcc$(EXESUF)
+ifdef CONFIG_CROSS
+PROGS+=arm-tcc$(EXESUF)
+endif
+endif
+ifeq ($(ARCH),arm)
+PROGS=tcc$(EXESUF)
+ifdef CONFIG_CROSS
+PROGS+=i386-tcc$(EXESUF)
+endif
+endif
+ifdef CONFIG_CROSS
+PROGS+=c67-tcc$(EXESUF) i386-win32-tcc$(EXESUF)
 endif
 endif
 
 # run local version of tcc with local libraries and includes
-TCC=tcc -B. -I.
+TCC=./tcc -B. -I.
 
-# 14/04/2026
-# all: tcc libtcc1.o bcheck.o tcc-doc.html libtcc.a libtcc_test
 all: $(PROGS) \
      libtcc1.a $(BCHECK_O) tcc-doc.html tcc.1 libtcc.a \
      libtcc_test$(EXESUF)
@@ -119,18 +135,53 @@ ex2: ex2.c
 ex3: ex3.c
 	$(CC) $(CFLAGS) -o $@ $<
 
-# Native Tiny C Compiler
-
-# 14/04/2026
-# tcc_g: tcc.c i386-gen.c tccelf.c tccasm.c i386-asm.c tcctok.h libtcc.h i386-asm.h Makefile
-	$(CC) $(CFLAGS) -o $@ $< $(LIBS)
-
+# Host Tiny C Compiler
+ifdef CONFIG_WIN32
+tcc$(EXESUF): tcc.c i386-gen.c tccelf.c tccasm.c i386-asm.c tcctok.h libtcc.h i386-asm.h tccpe.c
+	$(CC) $(CFLAGS) -DTCC_TARGET_PE -o $@ $< $(LIBS)
+else
+ifeq ($(ARCH),i386)
 tcc$(EXESUF): tcc.c i386-gen.c tccelf.c tccasm.c i386-asm.c tcctok.h libtcc.h i386-asm.h
 	$(CC) $(CFLAGS) -o $@ $< $(LIBS)
+endif
+ifeq ($(ARCH),arm)
+tcc$(EXESUF): tcc.c arm-gen.c tccelf.c tccasm.c tcctok.h libtcc.h
+	$(CC) $(CFLAGS) -DTCC_TARGET_ARM -o $@ $< $(LIBS)
+endif
+endif
+
+# Cross Tiny C Compilers
+i386-tcc$(EXESUF): tcc.c i386-gen.c tccelf.c tccasm.c i386-asm.c tcctok.h libtcc.h i386-asm.h
+	$(CC) $(CFLAGS) -o $@ $< $(LIBS)
+
+c67-tcc$(EXESUF): tcc.c c67-gen.c tccelf.c tccasm.c tcctok.h libtcc.h tcccoff.c
+	$(CC) $(CFLAGS) -DTCC_TARGET_C67 -o $@ $< $(LIBS)
+
+arm-tcc$(EXESUF): tcc.c arm-gen.c tccelf.c tccasm.c tcctok.h libtcc.h
+	$(CC) $(CFLAGS) -DTCC_TARGET_ARM -o $@ $< $(LIBS)
+
+i386-win32-tcc$(EXESUF): tcc.c i386-gen.c tccelf.c tccasm.c i386-asm.c tcctok.h libtcc.h i386-asm.h tccpe.c
+	$(CC) $(CFLAGS) -DTCC_TARGET_PE -o $@ $< $(LIBS)
+
+# windows utilities
+tiny_impdef$(EXESUF): tiny_impdef.c
+	$(CC) $(CFLAGS) -o $@ $< -lkernel32
 
 # TinyCC runtime libraries
-libtcc1.o: libtcc1.c
-	$(CC) -O2 -Wall -c -o $@ $<
+ifdef CONFIG_WIN32
+# for windows, we must use TCC because we generate ELF objects
+LIBTCC1_OBJS=$(addprefix win32/lib/, crt1.o wincrt1.o dllcrt1.o dllmain.o chkstk.o) libtcc1.o
+LIBTCC1_CC=./tcc.exe -Bwin32
+else
+LIBTCC1_OBJS=libtcc1.o
+LIBTCC1_CC=$(CC)
+endif
+
+%.o: %.c
+	$(LIBTCC1_CC) -O2 -Wall -c -o $@ $<
+
+%.o: %.S
+	$(LIBTCC1_CC) -c -o $@ $<
 
 libtcc1.a: $(LIBTCC1_OBJS)
 	$(AR) rcs $@ $^
@@ -140,20 +191,36 @@ bcheck.o: bcheck.c
 
 install: tcc_install libinstall
 
-tcc_install: $(PROGS) libtcc1.o bcheck.o
-	$(INSTALL) -m755 tcc $(bindir)
-	$(INSTALL) tcc.1 $(mandir)/man1
-	mkdir -p $(libdir)/tcc
-	mkdir -p $(libdir)/tcc/include
-	$(INSTALL) -m644 libtcc1.o bcheck.o $(libdir)/tcc
+tcc_install: $(PROGS) tcc.1 libtcc1.a $(BCHECK_O) tcc-doc.html tcc.1
+	mkdir -p "$(bindir)"
+	$(INSTALL) -s -m755 $(PROGS) "$(bindir)"
+ifndef CONFIG_WIN32
+	mkdir -p "$(mandir)/man1"
+	$(INSTALL) tcc.1 "$(mandir)/man1"
+endif
+	mkdir -p "$(tccdir)"
+	mkdir -p "$(tccdir)/include"
+ifdef CONFIG_WIN32
+	mkdir -p "$(tccdir)/lib"
+	$(INSTALL) -m644 libtcc1.a win32/lib/*.def "$(tccdir)/lib"
+	cp -r win32/include/. "$(tccdir)/include"
+	cp -r win32/examples/. "$(tccdir)/examples"
+else
+	$(INSTALL) -m644 libtcc1.a $(BCHECK_O) "$(tccdir)"
 	$(INSTALL) -m644 stdarg.h stddef.h stdbool.h float.h varargs.h \
-                   tcclib.h $(libdir)/tcc/include
+                   tcclib.h "$(tccdir)/include"
+endif
+	mkdir -p "$(docdir)"
+	$(INSTALL) -m644 tcc-doc.html "$(docdir)"
+ifdef CONFIG_WIN32
+	$(INSTALL) -m644 win32/readme.txt "$(docdir)"
+endif
 
 clean:
-	rm -f *~ *.o tcc tcc1 tcct tcc_g tcctest.ref *.bin *.i ex2 \
+	rm -f *~ *.o *.a tcc tcc1 tcct tcc_g tcctest.ref *.bin *.i ex2 \
            core gmon.out test.out test.ref a.out tcc_p \
-           *.exe tcc-doc.html libtcc.a libtcc_test \
-           tcctest[1234] test[1234].out
+           *.exe *.lib tcc.pod libtcc_test \
+           tcctest[1234] test[1234].out $(PROGS) win32/lib/*.o
 
 distclean: clean
 	rm -f config.h config.mak config.texi
@@ -163,13 +230,13 @@ tcc_p: tcc.c Makefile
 	$(CC) $(CFLAGS_P) -o $@ $< $(LIBS_P)
 
 # libtcc generation and example
-libinstall: libtcc.a
+libinstall: libtcc.a 
 	mkdir -p "$(libdir)"
-	$(INSTALL) -m644 libtcc.a $(libdir)
+	$(INSTALL) -m644 libtcc.a "$(libdir)"
 	mkdir -p "$(includedir)"
-	$(INSTALL) -m644 libtcc.h $(includedir)
+	$(INSTALL) -m644 libtcc.h "$(includedir)"
 
-libtcc.o: tcc.c i386-gen.c bcheck.c Makefile
+libtcc.o: tcc.c i386-gen.c Makefile
 	$(CC) $(CFLAGS) -DLIBTCC -c -o $@ $<
 
 libtcc.a: libtcc.o 
@@ -213,27 +280,19 @@ cache: tcc_g
 	cachegrind ./tcc_g -o /tmp/linpack -lm bench/linpack.c
 	vg_annotate tcc.c > /tmp/linpack.cache.log
 
-# documentation
+# documentation and man page
 tcc-doc.html: tcc-doc.texi
 	texi2html -monolithic -number $<
 
-FILES= Makefile Makefile.uClibc configure VERSION \
-       README TODO COPYING \
-       Changelog tcc-doc.texi tcc-doc.html \
-       tcc.1 \
-       tcc.c i386-gen.c tccelf.c tcctok.h tccasm.c  i386-asm.c i386-asm.h\
-       bcheck.c libtcc1.c \
-       elf.h stab.h stab.def \
-       stddef.h stdarg.h stdbool.h float.h varargs.h \
-       tcclib.h libtcc.h libtcc_test.c \
-       ex1.c ex2.c ex3.c ex4.c ex5.c \
-       tcctest.c boundtest.c gcctestsuite.sh
+tcc.1: tcc-doc.texi
+	./texi2pod.pl $< tcc.pod
+	pod2man --section=1 --center=" " --release=" " tcc.pod > $@
 
-FILE=tcc-$(VERSION)
+FILE=tcc-$(shell cat VERSION)
 
+# tar release (use 'make -k tar' on a checkouted tree)
 tar:
 	rm -rf /tmp/$(FILE)
-	mkdir -p /tmp/$(FILE)
-	cp -P $(FILES) /tmp/$(FILE)
-	( cd /tmp ; tar zcvf ~/$(FILE).tar.gz $(FILE) )
+	cp -r . /tmp/$(FILE)
+	( cd /tmp ; tar zcvf ~/$(FILE).tar.gz $(FILE) --exclude CVS )
 	rm -rf /tmp/$(FILE)
