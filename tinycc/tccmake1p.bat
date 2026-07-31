@@ -8,4 +8,4 @@ if %errorlevel% neq 0 (
 
 c:\tdm-gcc-32\bin\objcopy.exe -O binary TCC.tmp TCC.PRG
 del TCC.tmp
-echo TCC.PRG 0.9.18 CEKIRDEKLE %100 FLAT OLARAK DOGDU!
+echo TCC.PRG 0.9.23 CEKIRDEKLE %100 FLAT OLARAK DOGDU!

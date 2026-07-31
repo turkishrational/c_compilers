@@ -1,26 +1,31 @@
 /*
  *  TCC - Tiny C Compiler
- *  Copyright (c) 2001, 2002, 2003 Fabrice Bellard
+ * 
+ *  Copyright (c) 2001-2004 Fabrice Bellard
  *
- *  This program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2 of the License, or
- *  (at your option) any later version.
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2 of the License, or (at your option) any later version.
  *
- *  This program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *  GNU General Public License for more details.
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
+ * Lesser General Public License for more details.
  *
- *  You should have received a copy of the GNU General Public License
- *  along with this program; if not, write to the Free Software
- *  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
  */
 
+/* 31/07/2026 */
+/* 30/07/2026 */
 /* 29/07/2026 */
-/* 24/07/2026 */
+/* 28/07/2026 - TCC.PRG 0.9.23 */
+/* 24/07/2026 - TCC.PRG 0.9.18 */
 /* 23/07/2026 */
 /* 22/07/2026 */
+
 /* 09/07/2026 */
 /* 08/07/2026 - Google AI */ 
 
@@ -187,19 +192,25 @@ typedef struct Section {
     struct Section *reloc;        /* Relocation tracking metadata table cross-link */
     struct Section *hash;         /* Associated direct lookup symbol hash table */
     struct Section *next;         /* Pointer to the next section descriptor in layout */
+    /* 31/07/2026 - TCC 0.9.18 (0.9.23 Modified) */ 
     char name[64];                /* Literal human-readable section name identifier */
+    /* 28/07/2026 - TCC 0.9.20-0.9.27 */
+    // char name[1];              /* section name */
 } Section;
 
 /* GNU C Compiler attribute translation mapping */
 typedef struct AttributeDef {
     int aligned;                  /* Requested hardware memory alignment boundary */
+    int packed;   /* 28/07/2026 - TCC 0.9.23 */
     Section *section;             /* Target custom memory storage destination section */
     unsigned char func_call;      /* Assigned function calling convention (Defaults to FUNC_CDECL) */
 } AttributeDef;
 
 #define SYM_STRUCT     0x40000000 /* Symbol namespace mask for struct/union/enum definitions */
 #define SYM_FIELD      0x20000000 /* Symbol namespace mask for composite structure fields */
-#define SYM_FIRST_ANOM (1 << (31 - VT_STRUCT_SHIFT)) /* Base token allocator offset for anonymous symbols */
+// #define SYM_FIRST_ANOM (1 << (31 - VT_STRUCT_SHIFT))
+/* 30/07/2026 - TCC 0.9.24 - tcc.c */
+#define SYM_FIRST_ANOM 0x10000000 /* Base token allocator offset for anonymous symbols */
 
 /* Stored inside the 'Sym.c' metadata field */
 #define FUNC_NEW       1          /* Modern ANSI-compliant function prototype descriptor */
@@ -209,6 +220,13 @@ typedef struct AttributeDef {
 /* Stored inside the 'Sym.r' execution field */
 #define FUNC_CDECL     0          /* Standard C calling convention (Default stack cleanup by caller) */
 #define FUNC_STDCALL   1          /* Win32 WinAPI compatibility Pascal calling convention (Unused) */
+
+/* 28/07/2026 - TCC 0.9.23 */
+#define FUNC_FASTCALL1 2 /* first param in %eax */
+#define FUNC_FASTCALL2 3 /* first parameters in %eax, %edx */
+#define FUNC_FASTCALL3 4 /* first parameter in %eax, %edx, %ecx */
+/* 30/07/2026 - TCC 0.9.24 - tcc.c */
+// #define FUNC_FASTCALLW 5 /* first parameter in %ecx, %edx */
 
 /* Configuration assigned to the 'Sym.t' macro expansion processor */
 #define MACRO_OBJ      0          /* Standard object-like macro constant expansion block */
@@ -288,12 +306,17 @@ static int parse_flags;
 #define PARSE_FLAG_PREPROCESS 0x0001 /* Enforce standard source preprocessor execution tracking */
 #define PARSE_FLAG_TOK_NUM    0x0002 /* Interpret character sequences as raw native numbers directly */
 #define PARSE_FLAG_LINEFEED   0x0004 /* Capture carriage break signals returning them as standard tokens */
-/* 24/07/2026 - Google AI */
-// #define PARSE_FLAG_ASM_COMMENTS 0x0008  /* 0.9.23/0.9.27 kısıtlama takipleri için eklenen maske */
+/* 28/07/2026 - TCC 0.9.23 */
+#define PARSE_FLAG_ASM_COMMENTS 0x0008 /* '#' can be used for line comment */
 
 /* Core structural section endpoints mapped globally within memory architecture */
 static Section *text_section, *data_section, *bss_section; 
 static Section *cur_text_section; /* Target structural window code execution engine active mapping */
+
+/* 29/07/2026 - TCC 0.9.23 */
+#ifdef CONFIG_TCC_ASM
+static Section *last_text_section; /* to handle .previous asm directive */
+#endif
 
 /* Core global lookup tables linking symbols to memory segments */
 static Section *symtab_section, *strtab_section;
@@ -323,6 +346,11 @@ static char *funcname;
 static Sym *global_stack, *local_stack;
 static Sym *define_stack;
 static Sym *global_label_stack, *local_label_stack;
+
+/* 29/07/2026 - TCC 0.9.23 */
+/* symbol allocator */
+#define SYM_POOL_NB (8192 / sizeof(Sym))
+static Sym *sym_free_first;
 
 static SValue vstack[VSTACK_SIZE], *vtop;
 /* Predefined core compiler type descriptors */
@@ -376,6 +404,11 @@ struct TCCState {
 
     /* If true, standard compiler system headers are completely bypassed */
     int nostdinc;
+    /* 28/07/2026 - TCC 0.9.23 (Modified) */
+    int nostdlib;                 /* if true, no standard libraries are added */
+
+    /* 29/07/2026 */
+    int nocommon; /* if true, do not use common symbols for .bss data */
 
     /* 29/07/2026 */
     /* If true, enforces absolute pure static compilation linking modes */
@@ -388,6 +421,23 @@ struct TCCState {
     // int error_set_jmp_enabled;
     // jmp_buf error_jmp_buf;
     int nb_errors;
+
+    /* 29/07/2026 */
+
+    /* C language options */
+    int char_is_unsigned;
+    int leading_underscore;
+
+    /* warning switches */
+    int warn_write_strings;
+    int warn_unsupported;
+    int warn_error;
+
+    /* 28/07/2026 - TCC 0.9.23 (Modified) */
+    int warn_none;
+
+    /* 29/07/2026 */
+    int warn_implicit_function_declaration;
 
     /* Embedded architecture-specific inline assembler label stack descriptor */
     Sym *asm_labels;
@@ -434,6 +484,11 @@ struct TCCState {
 #define VT_UNSIGNED   0x0010  /* Modifier marking the type boundaries as positive unsigned memory data */
 #define VT_ARRAY      0x0020  /* Contiguous array structure memory layout modifier (implicitly enforces VT_PTR) */
 #define VT_BITFIELD   0x0040  /* Special structure internal boundary bitfield allocation track modifier */
+
+/* 28/07/2026 - TCC 0.9.23 */
+#define VT_CONSTANT   0x0800  /* const modifier */
+#define VT_VOLATILE   0x1000  /* volatile modifier */
+#define VT_SIGNED     0x2000  /* signed type */
 
 /* Variable allocation persistence storage classes */
 #define VT_EXTERN  0x00000080  /* External reference symbol linkage configuration marker */
@@ -506,6 +561,15 @@ struct TCCState {
 #define TOK_A_SHL 0x81
 #define TOK_A_SAR 0x82
 
+/* 29/07/2026 - TCC 0.9.23 */
+#ifndef offsetof
+#define offsetof(type, field) ((size_t) &((type *)0)->field)
+#endif
+
+#ifndef countof
+#define countof(tab) (sizeof(tab) / sizeof((tab)[0]))
+#endif
+
 /* WARNING: The exact internal storage layout string map indexes token definitions sequentially */
 static char tok_two_chars[] = "<=\236>=\235!=\225&&\240||\241++\244--\242==\224<<\1>>\2+=\253-=\255*=\252/=\257%=\245&=\246^=\336|=\374->\313..\250##\266";
 
@@ -574,20 +638,27 @@ static char tok_two_chars[] = "<=\236>=\235!=\225&&\240||\241++\244--\242==\224<
 
 #define TOK_ASM_int TOK_INT
 
-enum {
+/* 28/07/2026 */
+enum tcc_token {
     TOK_LAST = TOK_IDENT - 1,
 #define DEF(id, str) id,
 #include "tcctok.h"
 #undef DEF
 };
 
-static const char tcc_keywords[] = 
+static const char tcc_keywords[] =
 #define DEF(id, str) str "\0"
 #include "tcctok.h"
 #undef DEF
 ;
 
 #define TOK_UIDENT TOK_DEFINE
+
+/* 29/07/2026 */
+#undef exit
+void trdos_sys_exit(int exitcode);
+#define exit trdos_sys_exit
+/* ....... */
 
 /* =========================================================================
    GOOGLE AI & ERDOGAN TAN - THE UNIFICATION VICTORY (SNPRINTF OVERRIDE)
@@ -623,6 +694,8 @@ static void block(int *bsym, int *csym, int *case_sym, int *def_sym,
 static int expr_const(void);
 static void expr_eq(void);
 static void gexpr(void);
+/* 29/07/2026 - TCC 0.9.23 */
+static void gen_inline_functions(void);
 static void decl(int l);
 static void decl_initializer(CType *type, Section *sec, unsigned long c, 
                              int first, int size_only);
@@ -662,6 +735,8 @@ static void type_decl(CType *type, AttributeDef *ad, int *v, int td);
 /* Error Logging and Diagnostic Framework */
 void error(const char *fmt, ...);
 void vpushi(int v);
+/* 28/07/2026 - TCC 0.9.23 */
+void vrott(int n);
 void vset(CType *type, int r, int v);
 void type_to_str(char *buf, int buf_size, 
                  CType *type, const char *varstr);
@@ -697,16 +772,46 @@ static void put_stabd(int type, int other, int desc);
 #define AFF_PRINT_ERROR     0x0001 /* Print explicit diagnostics if target source file is missing */
 static int tcc_add_file_internal(TCCState *s, const char *filename, int flags);
 
+/* 29/07/2026 - TCC 0.9.23 */
+
 #ifdef CONFIG_TCC_ASM
-typedef struct ExprValue { uint32_t v; Sym *sym; } ExprValue;
+
+typedef struct ExprValue {
+    uint32_t v;
+    Sym *sym;
+} ExprValue;
+
 #define MAX_ASM_OPERANDS 30
-typedef struct ASMOperand { int id; char *constraint; char asm_str[16]; SValue *vt; int ref_index; int priority; int reg; int is_llong; } ASMOperand;
-static void asm_expr(struct TCCState *s1, ExprValue *pe);
-static int asm_int_expr(struct TCCState *s1);
-static int find_constraint(ASMOperand *operands, int nb_operands, const char *name, const char **pp);
-static int tcc_assemble(struct TCCState *s1, int do_preprocess);
+
+typedef struct ASMOperand {
+    int id; /* GCC 3 optional identifier (0 if number only supported) */
+    char *constraint;
+    char asm_str[16]; /* computed asm string for operand */
+    SValue *vt; /* C value of the expression */
+    int ref_index; /* if >= 0, gives reference to a output constraint */
+    int input_index; /* if >= 0, gives reference to an input constraint */
+    int priority; /* priority, used to assign registers */
+    int reg; /* if >= 0, register number used for this operand */
+    int is_llong; /* true if double register value */
+    int is_memory; /* true if memory operand */
+    int is_rw;     /* for '+' modifier */
+} ASMOperand;
+
+static void asm_expr(TCCState *s1, ExprValue *pe);
+static int asm_int_expr(TCCState *s1);
+static int find_constraint(ASMOperand *operands, int nb_operands, 
+                           const char *name, const char **pp);
+
+static int tcc_assemble(TCCState *s1, int do_preprocess);
+
 #endif
+
+/* ...... */
+
 static void asm_instr(void);
+/* 29/07/2026 - TCC 0.9.23 */
+static void asm_global_instr(void);
+
 static inline int is_float(int t) { int bt; bt = t & VT_BTYPE; return bt == VT_LDOUBLE || bt == VT_DOUBLE || bt == VT_FLOAT; }
 #ifdef TCC_TARGET_I386
 #include "i386-gen.c"
@@ -827,6 +932,13 @@ static void dynarray_add(void ***ptab, int *nb_ptr, void *data)
     *nb_ptr = nb;
 }
 
+/* 29/07/2026 - TCC 0.9.23 */
+static inline void sym_free(Sym *sym)
+{
+    sym->next = sym_free_first;
+    sym_free_first = sym;
+}
+
 /* Create and initialize a new structured binary layout section */
 Section *new_section(TCCState *s1, const char *name, int sh_type, int sh_flags)
 {
@@ -916,31 +1028,48 @@ Section *find_section(TCCState *s1, const char *name)
     return new_section(s1, name, SHT_PROGBITS, SHF_ALLOC);
 }
 
+/* 29/07/2026 - TCC 0.9.23 */
+#define SECTION_ABS ((void *)1)
+
 /* Update structural symbol index properties mapping them to low-level target section definitions */
-static void put_extern_sym(Sym *sym, Section *section, 
-                           unsigned long value, unsigned long size)
+static void put_extern_sym2(Sym *sym, Section *section, 
+                            unsigned long value, unsigned long size,
+                            int can_add_underscore)
 {
     int sym_type, sym_bind, sh_num, info;
     Elf32_Sym *esym;
     const char *name;
+    // char buf1[256];  /* 29/07/2026 - TCC 0.9.23 */
 
-    if (section)
-        sh_num = section->sh_num;
-    else
+    /* 29/07/2026 - TCC 0.9.23 */
+    if (section == NULL)
         sh_num = SHN_UNDEF;
-        
+    else if (section == SECTION_ABS) 
+        sh_num = SHN_ABS;
+    else
+        sh_num = section->sh_num;
+
     if (!sym->c) {
         if ((sym->type.t & VT_BTYPE) == VT_FUNC)
             sym_type = STT_FUNC;
         else
             sym_type = STT_OBJECT;
-            
+
         if (sym->type.t & VT_STATIC)
             sym_bind = STB_LOCAL;
         else
             sym_bind = STB_GLOBAL;
-        
+
         name = get_tok_str(sym->v, NULL);
+
+        /* 29/07/2026 - TCC 0.9.23 (Modified) */
+        if (tcc_state->leading_underscore && can_add_underscore) {
+            char buf1[256]; /* 29/07/2026 */
+            buf1[0] = '_';
+            pstrcpy(buf1 + 1, sizeof(buf1) - 1, name);
+            name = buf1;
+        }
+
         info = ELF32_ST_INFO(sym_bind, sym_type);
         sym->c = add_elf_sym(symtab_section, value, size, info, sh_num, name);
     } else {
@@ -949,6 +1078,13 @@ static void put_extern_sym(Sym *sym, Section *section,
         esym->st_size = size;
         esym->st_shndx = sh_num;
     }
+}
+
+/* 29/07/2026 - TCC 0.9.23 */
+static void put_extern_sym(Sym *sym, Section *section, 
+                           unsigned long value, unsigned long size)
+{
+    put_extern_sym2(sym, section, value, size, 1);
 }
 
 /* Enject a new active relocation entry pointing to symbol identifier within structural section s */
@@ -1007,14 +1143,17 @@ static void strcat_printf(char *buf, int buf_size, const char *fmt, ...)
 }
 
 /* Internal detailed diagnostics generator tracking structural preprocessor include file trace stacks */
+/* 29/07/2026 */
 /* 20/07/2026 - Google AI */
 /* =========================================================================
    TRDOS 386 FLAT BELLEK UYUMLU DOĞRUDAN DIAGNOSTIC MOTORU
    ========================================================================= */
-void error1_flat(TCCState *s1, const char *fmt, void *arg1, void *arg2, void *arg3)
+// void error1_flat(TCCState *s1, const char *fmt, void *arg1, void *arg2, void *arg3)
+/* 29/07/2026 - TCC 0.9.23 (Modified) */
+void error1_flat(TCCState *s1, int is_warning, const char *fmt, void *arg1, void *arg2, void *arg3)
 {
     BufferedFile **f;
-  
+
     /* 1. Include yığın izleme mekanizması */
     if (file && s1) {
         for(f = s1->include_stack; f < s1->include_stack_ptr; f++) {
@@ -1033,16 +1172,28 @@ void error1_flat(TCCState *s1, const char *fmt, void *arg1, void *arg2, void *ar
     } else {
         printf("tcc: ");
     }
-    
-    printf("error: ");
-        
+
+    // printf("error: ");
+    /* 29/07/2026 - TCC 0.9.23 (Modified) */
+    if (is_warning) {
+       printf("warning: ");
+    } else {
+       printf("error: ");
+    }
+
     /* 3. Kararsız vprintf yerine standart printf ile güvenli formatlama */
     printf(fmt, arg1, arg2, arg3);
     printf("\n");
 
-    if (s1) s1->nb_errors++;
+    // if (s1) s1->nb_errors++;
+    /* 29/07/2026 - TCC 0.9.23 (Modified) */
+    if (s1) {
+        if (!is_warning || s1->warn_error)
+            s1->nb_errors++;
+    }
 }
 
+/* 29/07/2026 */
 /* 20/07/2026 - Google AI */
 /* =========================================================================
    GOOGLE AI & ERDOGAN TAN - CRITICAL FATAL EVACUATION SHIELD
@@ -1053,22 +1204,28 @@ void error(const char *fmt, ...)
     void **args = (void **)&fmt;
 
     printf("\n-> [TCC FATAL ERROR]: ");
-    
+
     /* va_list kullanılmaz! Stack üzerindeki argümanlar sıralı olarak yakalanır */
-    error1_flat(s1, fmt, args[1], args[2], args[3]);
+    // error1_flat(s1, fmt, args[1], args[2], args[3]);
+    /* 29/07/2026 - TCC 0.9.23 (Modified) */
+    error1_flat(s1, 0, fmt, args[1], args[2], args[3]);
 
     printf("-> [TRDOS SHIELD]: Terminating via sys_exit(1).\n");
 
     /* Fatal enforcement trap: Trigger hardware system exit interrupt call */
-    __asm__ __volatile__ (
-        ".intel_syntax noprefix\n"
-        "mov ebx, 1\n"                 /* Exit parameter payload: 1 (Error) */
-        "mov eax, 1\n"                 /* TRDOS kernel service index: sys_exit */
-        "int 0x40\n"                   /* Vector directly into Ring 0 */
-        ".att_syntax\n"
-    );
+    // __asm__ __volatile__ (
+    //    ".intel_syntax noprefix\n"
+    //    "mov ebx, 1\n"                 /* Exit parameter payload: 1 (Error) */
+    //    "mov eax, 1\n"                 /* TRDOS kernel service index: sys_exit */
+    //    "int 0x40\n"                   /* Vector directly into Ring 0 */
+    //    ".att_syntax\n"
+    // );
+   
+    /* 31/07/2026 */
+    exit(1);	 /* trdos_sys_exit(int exit_code) */
 }
 
+/* 29/07/2026 */
 /* 20/07/2026 - Google AI */
 /* =========================================================================
    GOOGLE AI & ERDOGAN TAN - NON-ABORTING DIAGNOSTIC INTERCEPTOR
@@ -1082,7 +1239,9 @@ void error_noabort(const char *fmt, ...)
     printf("\n-> [TCC WARNING/ERROR]: ");
 
     /* va_list kullanılmaz! Stack üzerindeki argümanlar sıralı olarak yakalanır */
-    error1_flat(s1, fmt, args[1], args[2], args[3]);
+    // error1_flat(s1, fmt, args[1], args[2], args[3]);
+    /* 29/07/2026 - TCC 0.9.23 (Modified) */
+    error1_flat(s1, 0, fmt, args[1], args[2], args[3]);
 
     printf("\n");
 }
@@ -1093,15 +1252,23 @@ void expect(const char *msg)
     error("%s expected", msg);
 }
 
-/* 20/07/2026 */
+/* 29/07/2026 */
+/* 28/07/2026 - TCC.PRG 0.9.23 */
+/* 20/07/2026 - TCC.PRG 0.9.18 */
 /* Capture standard grammar deviations sending localized traces to the tracker engine */
 void warning(const char *fmt, ...)
 {
     TCCState *s1 = tcc_state;
-    void **args = (void **)&fmt;
 
+    /* 28/07/2026 - TCC 0.9.23 ( Modified) */
+    if (s1->warn_none)
+       return;
+
+    void **args = (void **)&fmt;
     /* va_list kullanılmaz! Stack üzerindeki argümanlar sıralı olarak yakalanır */
-    error1_flat(s1, fmt, args[1], args[2], args[3]);
+    // error1_flat(s1, fmt, args[1], args[2], args[3]);
+    /* 29/07/2026 - TCC 0.9.23 (Modified) */
+    error1_flat(s1, 1, fmt, args[1], args[2], args[3]);
 }
 
 /* Enforce validation for expected language punctuation markers advancing on match */
@@ -4368,6 +4535,21 @@ void vrotb(int n)
     vtop[0] = tmp;
 }
 
+/* 28/07/2026 - TCC 0.9.23 */
+/* rotate n first stack elements to the top 
+   I1 ... In -> In I1 ... I(n-1)  [top is right]
+ */
+void vrott(int n)
+{
+    int i;
+    SValue tmp;
+
+    tmp = vtop[0];
+    for(i = 0;i < n - 1; i++)
+        vtop[-i] = vtop[-i - 1];
+    vtop[-n + 1] = tmp;
+}
+
 /* Pop the active top entry frame off the internal execution evaluation stack */
 void vpop(void)
 {
@@ -4422,12 +4604,15 @@ void gv_dup(void)
     }
 }
 
+/* 28/07/2026 - TCC 0.9.23 */
+
 /* Generate CPU independent 64-bit (unsigned) long long operations and semantic logic rules */
 void gen_opl(int op)
 {
     int t, a, b, op1, c, i;
     int func;
-    GFuncContext gf;
+    /* 28/07/2026 */
+    // GFuncContext gf;
     SValue tmp;
 
     switch(op) {
@@ -4445,11 +4630,15 @@ void gen_opl(int op)
         func = TOK___umoddi3;
     gen_func:
         /* Route and dispatch generic 64-bit long long math runtime library function call loops */
-        gfunc_start(&gf, FUNC_CDECL);
-        gfunc_param(&gf);
-        gfunc_param(&gf);
+        /* 28/07/2026 */
+        // gfunc_start(&gf, FUNC_CDECL);
+        // gfunc_param(&gf);
+        // gfunc_param(&gf);
         vpush_global_sym(&func_old_type, func);
-        gfunc_call(&gf);
+        // gfunc_call(&gf);
+        /* 28/07/2026 */
+        vrott(3);
+        gfunc_call(2);
         vpushi(0);
         vtop->r = REG_IRET;
         vtop->r2 = REG_LRET;
@@ -4512,6 +4701,7 @@ void gen_opl(int op)
             vrotb(3);
             gen_op(op);
         }
+        /* stack: L H */
         lbuild(t);
         break;
     case TOK_SAR:
@@ -4528,8 +4718,9 @@ void gen_opl(int op)
             vpop();
             if (op != TOK_SHL)
                 vswap();
-                
+
             if (c >= 32) {
+                /* stack: L H */
                 vpop();
                 if (c > 32) {
                     vpushi(c - 32);
@@ -4546,6 +4737,7 @@ void gen_opl(int op)
             } else {
                 vswap();
                 gv_dup();
+                /* stack: H L L */
                 vpushi(c);
                 gen_op(op);
                 vswap();
@@ -4555,7 +4747,7 @@ void gen_opl(int op)
                 else
                     gen_op(TOK_SHL);
                 vrotb(3);
-                
+                /* stack: L L H */
                 vpushi(c);
                 if (op == TOK_SHL)
                     gen_op(TOK_SHL);
@@ -4588,11 +4780,13 @@ void gen_opl(int op)
         lexpand();
         vrotb(3);
         lexpand();
-        
+
         tmp = vtop[-1];
         vtop[-1] = vtop[-2];
         vtop[-2] = tmp;
-        
+
+        /* stack: L1 L2 H1 H2 */
+
         /* Invert and recalibrate logic boundaries when values evaluate as equal to handle low dword checks */
         op1 = op;
         if (op1 == TOK_LT)
@@ -4603,7 +4797,7 @@ void gen_opl(int op)
             op1 = TOK_ULE;
         else if (op1 == TOK_UGT)
             op1 = TOK_UGE;
-            
+
         a = 0;
         b = 0;
         gen_op(op1);
@@ -4618,7 +4812,7 @@ void gen_opl(int op)
                 b = psym(0x850f, 0);
             }
         }
-        
+
         /* Execute comparison on low dwords. This layout layer evaluates strictly as unsigned */
         op1 = op;
         if (op1 == TOK_LT)
@@ -4822,6 +5016,73 @@ static int pointed_size(CType *type)
     return type_size(pointed_type(type), &align);
 }
 
+/* 28/07/2026 - TCC 0.9.23 */
+
+static inline int is_null_pointer(SValue *p)
+{
+    if ((p->r & (VT_VALMASK | VT_LVAL | VT_SYM)) != VT_CONST)
+        return 0;
+    return ((p->type.t & VT_BTYPE) == VT_INT && p->c.i == 0) ||
+        ((p->type.t & VT_BTYPE) == VT_LLONG && p->c.ll == 0);
+}
+
+static inline int is_integer_btype(int bt)
+{
+    return (bt == VT_BYTE || bt == VT_SHORT ||
+            bt == VT_INT || bt == VT_LLONG);
+}
+
+/* 28/07/2026 - TCC 0.9.23 */
+
+/* check types for comparison or substraction of pointers */
+static void check_comparison_pointer_types(SValue *p1, SValue *p2, int op)
+{
+    CType *type1, *type2, tmp_type1, tmp_type2;
+    int bt1, bt2;
+
+    /* null pointers are accepted for all comparisons as gcc */
+    if (is_null_pointer(p1) || is_null_pointer(p2))
+        return;
+    type1 = &p1->type;
+    type2 = &p2->type;
+    bt1 = type1->t & VT_BTYPE;
+    bt2 = type2->t & VT_BTYPE;
+    /* accept comparison between pointer and integer with a warning */
+    if ((is_integer_btype(bt1) || is_integer_btype(bt2)) && op != '-') {
+        warning("comparison between pointer and integer");
+        return;
+    }
+
+    /* both must be pointers or implicit function pointers */
+    if (bt1 == VT_PTR) {
+        type1 = pointed_type(type1);
+    } else if (bt1 != VT_FUNC) 
+        goto invalid_operands;
+
+    if (bt2 == VT_PTR) {
+        type2 = pointed_type(type2);
+    } else if (bt2 != VT_FUNC) { 
+    invalid_operands:
+        error("invalid operands to binary %s", get_tok_str(op, NULL));
+    }
+    if ((type1->t & VT_BTYPE) == VT_VOID || 
+        (type2->t & VT_BTYPE) == VT_VOID)
+        return;
+    tmp_type1 = *type1;
+    tmp_type2 = *type2;
+    tmp_type1.t &= ~(VT_UNSIGNED | VT_CONSTANT | VT_VOLATILE);
+    tmp_type2.t &= ~(VT_UNSIGNED | VT_CONSTANT | VT_VOLATILE);
+    if (!is_compatible_types(&tmp_type1, &tmp_type2)) {
+        /* gcc-like error if '-' is used */
+        if (op == '-')
+            goto invalid_operands;
+        else
+            warning("comparison of distinct pointer types lacks a cast");
+    }
+}
+
+/* 28/07/2026 - TCC 0.9.23 */
+
 /* Generic binary operation engine: Evaluates language semantics and handles implicit type promotions */
 void gen_op(int op)
 {
@@ -4832,11 +5093,15 @@ void gen_op(int op)
     t2 = vtop[0].type.t;
     bt1 = t1 & VT_BTYPE;
     bt2 = t2 & VT_BTYPE;
-        
+
     if (bt1 == VT_PTR || bt2 == VT_PTR) {
         /* Evaluation path: At least one of the operational operands is an active pointer structure */
         if (op >= TOK_ULT && op <= TOK_GT) {
             /* Relational checks: Map cross-pointer comparison operands strictly as unsigned integers */
+     
+            /* 28/07/2026 - TCC 0.9.23 */
+            check_comparison_pointer_types(vtop - 1, vtop, op);
+
             t = VT_INT | VT_UNSIGNED;
             goto std_op;
         }
@@ -4845,10 +5110,13 @@ void gen_op(int op)
         if (bt1 == VT_PTR && bt2 == VT_PTR) {
             if (op != '-')
                 error("cannot use pointers here");
-                
+
+            /* 28/07/2026 - TCC 0.9.23 */         
+            check_comparison_pointer_types(vtop - 1, vtop, op);
+
             u = pointed_size(&vtop[-1].type);
             gen_opic(op);
-            
+
             /* Enforce integer type destination masking pointer distance parameters */
             vtop->type.t = VT_INT; 
             vpushi(u);
@@ -4945,22 +5213,29 @@ void gen_op(int op)
     }
 }
 
+/* 28/07/2026 - TCC 0.9.23 */
+
 /* Generic integer to floating-point conversion wrapper optimized for 64-bit unsigned long long case */
 void gen_cvt_itof1(int t)
 {
-    GFuncContext gf;
+    /* 28/07/2026 */
+    // GFuncContext gf;
 
     if ((vtop->type.t & (VT_BTYPE | VT_UNSIGNED)) == (VT_LLONG | VT_UNSIGNED)) {
         /* Dispatch and route generic 64-bit runtime conversion function call loops */
-        gfunc_start(&gf, FUNC_CDECL);
-        gfunc_param(&gf);
+        // gfunc_start(&gf, FUNC_CDECL);
+        // gfunc_param(&gf);
         if (t == VT_FLOAT)
             vpush_global_sym(&func_old_type, TOK___ulltof);
         else if (t == VT_DOUBLE)
             vpush_global_sym(&func_old_type, TOK___ulltod);
         else
             vpush_global_sym(&func_old_type, TOK___ulltold);
-        gfunc_call(&gf);
+        // gfunc_call(&gf);
+        /* 28/07/2026 */
+        vrott(2);
+        gfunc_call(1);
+        /* .... */
         vpushi(0);
         vtop->r = REG_FRET;
     } else {
@@ -4969,24 +5244,31 @@ void gen_cvt_itof1(int t)
     }
 }
 
+/* 28/07/2026 - TCC 0.9.23 */
+
 /* Generic floating-point to integer conversion wrapper optimized for 64-bit unsigned long long case */
 void gen_cvt_ftoi1(int t)
 {
-    GFuncContext gf;
+    /* 28/07/2026 */
+    // GFuncContext gf;
     int st;
 
     if (t == (VT_LLONG | VT_UNSIGNED)) {
         /* Enforce software runtime library implementation fallback as x86 cannot process this natively */
-        gfunc_start(&gf, FUNC_CDECL);
+        // gfunc_start(&gf, FUNC_CDECL);
         st = vtop->type.t & VT_BTYPE;
-        gfunc_param(&gf);
+        // gfunc_param(&gf);
         if (st == VT_FLOAT)
             vpush_global_sym(&func_old_type, TOK___fixunssfdi);
         else if (st == VT_DOUBLE)
             vpush_global_sym(&func_old_type, TOK___fixunsdfdi);
         else
             vpush_global_sym(&func_old_type, TOK___fixunsxfdi);
-        gfunc_call(&gf);
+        // gfunc_call(&gf);
+        /* 28/07/2026 */
+        vrott(2);
+        gfunc_call(1);
+        /* .... */
         vpushi(0);
         vtop->r = REG_IRET;
         vtop->r2 = REG_LRET;
@@ -5210,62 +5492,70 @@ static void mk_pointer(CType *type)
     type->ref = s;
 }
 
-/* Evaluate and verify if two abstract data type descriptors maintain language level compatibility boundaries */
-static int is_compatible_types(CType *type1, CType *type2)
+/* 28/07/2026 - TCC 0.9.23 */ 
+
+/* compare function types. OLD functions match any new functions */
+static int is_compatible_func(CType *type1, CType *type2)
 {
     Sym *s1, *s2;
-    int bt1, bt2, t1, t2;
+
+    s1 = type1->ref;
+    s2 = type2->ref;
+    if (!is_compatible_types(&s1->type, &s2->type))
+        return 0;
+    /* check func_call */
+    if (s1->r != s2->r)
+        return 0;
+    /* Legacy fallback: Support prototype overrides if historical K&R style parameters are cached */
+    if (s1->c == FUNC_OLD || s2->c == FUNC_OLD)
+        return 1;
+    if (s1->c != s2->c)
+        return 0;
+    while (s1 != NULL) {
+        if (s2 == NULL)
+            return 0;
+        if (!is_compatible_types(&s1->type, &s2->type))
+            return 0;
+        s1 = s1->next;
+        s2 = s2->next;
+    }
+    if (s2)
+        return 0;
+    return 1;
+}
+
+/* 28/07/2026 - TCC 0.9.23 */ 
+
+/* return true if type1 and type2 are exactly the same (including
+   qualifiers).
+
+   - enums are not checked as gcc __builtin_types_compatible_p ()
+ */
+static int is_compatible_types(CType *type1, CType *type2)
+{
+    int bt1, t1, t2;
 
     t1 = type1->t & VT_TYPE;
     t2 = type2->t & VT_TYPE;
+    /* XXX: bitfields ? */
+    if (t1 != t2)
+        return 0;
+    /* test more complicated cases */
     bt1 = t1 & VT_BTYPE;
-    bt2 = t2 & VT_BTYPE;
-    
     if (bt1 == VT_PTR) {
         type1 = pointed_type(type1);
-        /* Function exception: Convert implicitly to functional code pointer targets seamlessly */
-        if (bt2 != VT_FUNC) {
-            if (bt2 != VT_PTR)
-                return 0;
-            type2 = pointed_type(type2);
-        }
-        /* Strict void tracking check: Void pointer abstractions safely match arbitrary memory type descriptors */
-        if ((type1->t & VT_TYPE) == VT_VOID || (type2->t & VT_TYPE) == VT_VOID)
-            return 1;
+        type2 = pointed_type(type2);
         return is_compatible_types(type1, type2);
-    } else if (bt1 == VT_STRUCT || bt2 == VT_STRUCT) {
+    } else if (bt1 == VT_STRUCT) {
         return (type1->ref == type2->ref);
     } else if (bt1 == VT_FUNC) {
-        if (bt2 != VT_FUNC)
-            return 0;
-        s1 = type1->ref;
-        s2 = type2->ref;
-        
-        if (!is_compatible_types(&s1->type, &s2->type))
-            return 0;
-            
-        /* Legacy fallback: Support prototype overrides if historical K&R style parameters are cached */
-        if (s1->c == FUNC_OLD || s2->c == FUNC_OLD)
-            return 1;
-        if (s1->c != s2->c)
-            return 0;
-            
-        while (s1 != NULL) {
-            if (s2 == NULL)
-                return 0;
-            if (!is_compatible_types(&s1->type, &s2->type))
-                return 0;
-            s1 = s1->next;
-            s2 = s2->next;
-        }
-        if (s2)
-            return 0;
-        return 1;
+        return is_compatible_func(type1, type2);
     } else {
         return 1;
     }
 }
 
+/* 28/07/2026 - TCC 0.9.23 */
 /* Print and format a structured C type descriptor straight into a human-readable destination buffer */
 void type_to_str(char *buf, int buf_size, CType *type, const char *varstr)
 {
@@ -5277,7 +5567,14 @@ void type_to_str(char *buf, int buf_size, CType *type, const char *varstr)
     t = type->t & VT_TYPE;
     bt = t & VT_BTYPE;
     buf[0] = '\0';
-    
+
+    /* 28/07/2026 - TCC 0.9.23 */
+    if (t & VT_CONSTANT)
+        pstrcat(buf, buf_size, "const ");
+    if (t & VT_VOLATILE)
+        pstrcat(buf, buf_size, "volatile ");
+    /* ... */    
+
     if (t & VT_UNSIGNED)
         pstrcat(buf, buf_size, "unsigned ");
         
@@ -5356,131 +5653,168 @@ void type_to_str(char *buf, int buf_size, CType *type, const char *varstr)
  no_var: ;
 }
 
+/* 28/07/2026 - TCC 0.9.23 */
+
 /* Verify type compatibility to store vtop into 'dt' target type, injecting explicit casts if needed */
 static void gen_assign_cast(CType *dt)
 {
-    CType *st;
+    CType *st, *type1, *type2, tmp_type1, tmp_type2;
     char buf1[256], buf2[256];
     int dbt, sbt;
 
-    st = &vtop->type; /* Target core source type */
+    st = &vtop->type; /* source type */
     dbt = dt->t & VT_BTYPE;
     sbt = st->t & VT_BTYPE;
-    
-    if (dbt == VT_PTR) {
-        /* Evaluate special type promotion constraints for pointer assignments */
+    if (dt->t & VT_CONSTANT)
+        warning("assignment of read-only location");
+    switch(dbt) {
+    case VT_PTR:
+        /* special cases for pointers */
+        /* '0' can also be a pointer */
+        if (is_null_pointer(vtop))
+            goto type_ok;
+        /* accept implicit pointer to integer cast with warning */
+        if (is_integer_btype(sbt)) {
+            warning("assignment makes pointer from integer without a cast");
+            goto type_ok;
+        }
+        type1 = pointed_type(dt);
+        /* a function is implicitely a function pointer */
         if (sbt == VT_FUNC) {
-            if (!is_compatible_types(pointed_type(dt), st))
+            if ((type1->t & VT_BTYPE) != VT_VOID &&
+                !is_compatible_types(pointed_type(dt), st))
                 goto error;
             else
                 goto type_ok;
         }
-        
-        /* Enforce absolute literal 0 value compatibility mapping it as a standard valid null pointer */
-        if (sbt == VT_INT && ((vtop->r & (VT_VALMASK | VT_LVAL | VT_SYM)) == VT_CONST) && vtop->c.i == 0)
-            goto type_ok;
-            
-        /* Process and allow implicit pointer-from-integer conversions, generating compile-time warnings */
-        if (sbt == VT_BYTE || sbt == VT_SHORT || sbt == VT_INT || sbt == VT_LLONG) {
-            warning("assignment makes pointer from integer without a cast");
-            goto type_ok;
+        if (sbt != VT_PTR)
+            goto error;
+        type2 = pointed_type(st);
+        if ((type1->t & VT_BTYPE) == VT_VOID || 
+            (type2->t & VT_BTYPE) == VT_VOID) {
+            /* void * can match anything */
+        } else {
+            /* exact type match, except for unsigned */
+            tmp_type1 = *type1;
+            tmp_type2 = *type2;
+            tmp_type1.t &= ~(VT_UNSIGNED | VT_CONSTANT | VT_VOLATILE);
+            tmp_type2.t &= ~(VT_UNSIGNED | VT_CONSTANT | VT_VOLATILE);
+            if (!is_compatible_types(&tmp_type1, &tmp_type2))
+                goto error;
         }
-    } else if (dbt == VT_BYTE || dbt == VT_SHORT || dbt == VT_INT || dbt == VT_LLONG) {
+        /* check const and volatile */
+        if ((!(type1->t & VT_CONSTANT) && (type2->t & VT_CONSTANT)) ||
+            (!(type1->t & VT_VOLATILE) && (type2->t & VT_VOLATILE)))
+            warning("assignment discards qualifiers from pointer target type");
+        break;
+    case VT_BYTE:
+    case VT_SHORT:
+    case VT_INT:
+    case VT_LLONG:
         if (sbt == VT_PTR || sbt == VT_FUNC) {
             warning("assignment makes integer from pointer without a cast");
-            goto type_ok;
         }
+        /* XXX: more tests */
+        break;
+    case VT_STRUCT:
+        tmp_type1 = *dt;
+        tmp_type2 = *st;
+        tmp_type1.t &= ~(VT_CONSTANT | VT_VOLATILE);
+        tmp_type2.t &= ~(VT_CONSTANT | VT_VOLATILE);
+        if (!is_compatible_types(&tmp_type1, &tmp_type2)) {
+        error:
+            type_to_str(buf1, sizeof(buf1), st, NULL);
+            type_to_str(buf2, sizeof(buf2), dt, NULL);
+            error("cannot cast '%s' to '%s'", buf1, buf2);
+        }
+        break;
     }
-    
-    if (!is_compatible_types(dt, st)) {
-    error:
-        type_to_str(buf1, sizeof(buf1), st, NULL);
-        type_to_str(buf2, sizeof(buf2), dt, NULL);
-        error("cannot cast '%s' to '%s'", buf1, buf2);
-    }
-    
-type_ok:
+ type_ok:
     gen_cast(dt);
 }
 
-/* Store the current vtop stack value entry straight into the underlying lvalue structure cached on stack */
+/* 28/07/2026 - TCC 0.9.23 */
+
+/* store vtop in lvalue pushed on stack */
 void vstore(void)
 {
     int sbt, dbt, ft, r, t, size, align, bit_size, bit_pos, rc, delayed_cast;
-    GFuncContext gf;
 
     ft = vtop[-1].type.t;
     sbt = vtop->type.t & VT_BTYPE;
     dbt = ft & VT_BTYPE;
-    
-    if (((sbt == VT_INT || sbt == VT_SHORT) && dbt == VT_BYTE) || (sbt == VT_INT && dbt == VT_SHORT)) {
-        /* Optimization path: Delay immediate short/char cast generation to streamline register utilization */
+    if (((sbt == VT_INT || sbt == VT_SHORT) && dbt == VT_BYTE) ||
+        (sbt == VT_INT && dbt == VT_SHORT)) {
+        /* optimize char/short casts */
         delayed_cast = VT_MUSTCAST;
         vtop->type.t = ft & VT_TYPE;
+        /* XXX: factorize */
+        if (ft & VT_CONSTANT)
+            warning("assignment of read-only location");
     } else {
         delayed_cast = 0;
-        gen_assign_cast(&vtop[-1].type);
+        if (!(ft & VT_BITFIELD))
+            gen_assign_cast(&vtop[-1].type);
     }
 
     if (sbt == VT_STRUCT) {
-        /* Composite structures assignment: Delegate payload replication straight to native memcpy loops */
+        /* if structure, only generate pointer */
+        /* structure assignment : generate memcpy */
+        /* XXX: optimize if small size */
         if (!nocode_wanted) {
-            vdup();
-            gfunc_start(&gf, FUNC_CDECL);
-            
             size = type_size(&vtop->type, &align);
-            vpushi(size);
-            gfunc_param(&gf);
-            
-            /* Secure the source address parameters */
-            vtop->type.t = VT_INT;
-            gaddrof();
-            gfunc_param(&gf);
-            
-            /* Secure the destination address parameters */
-            vswap();
-            vtop->type.t = VT_INT;
-            gaddrof();
-            gfunc_param(&gf);
-            
-            save_regs(0);
+
             vpush_global_sym(&func_old_type, TOK_memcpy);
-            gfunc_call(&gf);
+
+            /* destination */
+            vpushv(vtop - 2);
+            vtop->type.t = VT_INT;
+            gaddrof();
+            /* source */
+            vpushv(vtop - 2);
+            vtop->type.t = VT_INT;
+            gaddrof();
+            /* type size */
+            vpushi(size);
+            gfunc_call(3);
+            
+            vswap();
+            vpop();
         } else {
             vswap();
             vpop();
         }
+        /* leave source on stack */
     } else if (ft & VT_BITFIELD) {
-        /* Process dynamic bitfield packing, parsing targeted bit size and shift position attributes */
+        /* bitfield store handling */
         bit_pos = (ft >> VT_STRUCT_SHIFT) & 0x3f;
         bit_size = (ft >> (VT_STRUCT_SHIFT + 6)) & 0x3f;
-        
+        /* remove bit field info to avoid loops */
         vtop[-1].type.t = ft & ~(VT_BITFIELD | (-1 << VT_STRUCT_SHIFT));
 
+        /* duplicate destination */
         vdup();
         vtop[-1] = vtop[-2];
 
+        /* mask and shift source */
         vpushi((1 << bit_size) - 1);
         gen_op('&');
         vpushi(bit_pos);
         gen_op(TOK_SHL);
-        
+        /* load destination, mask and or with source */
         vswap();
         vpushi(~(((1 << bit_size) - 1) << bit_pos));
         gen_op('&');
         gen_op('|');
-        
+        /* store result */
         vstore();
     } else {
-        /* Runtime memory bounds verification kancaları safely dismantled to optimize flat execution paths */
         if (!nocode_wanted) {
             rc = RC_INT;
             if (is_float(ft))
                 rc = RC_FLOAT;
-                
-            r = gv(rc);
-            
-            /* If the destination lvalue context resides inside local storage, fetch its absolute register address */
+            r = gv(rc);  /* generate value */
+            /* if lvalue was saved on stack, must read it */
             if ((vtop[-1].r & VT_VALMASK) == VT_LLOCAL) {
                 SValue sv;
                 t = get_reg(RC_INT);
@@ -5491,21 +5825,22 @@ void vstore(void)
                 vtop[-1].r = t | VT_LVAL;
             }
             store(r, vtop - 1);
-            
-            /* Handle 64-bit long long structures shifting low/high dwords sequentially into memory cells + 4 */
+            /* two word case handling : store second register at word + 4 */
             if ((ft & VT_BTYPE) == VT_LLONG) {
                 vswap();
+                /* convert to int to increment easily */
                 vtop->type.t = VT_INT;
                 gaddrof();
                 vpushi(4);
                 gen_op('+');
                 vtop->r |= VT_LVAL;
                 vswap();
+                /* XXX: it works because r2 is spilled last ! */
                 store(vtop->r2, vtop - 1);
             }
         }
         vswap();
-        vtop--; /* Enforce direct stack decrement over vpop() to shield native x87 FPU cache states from flushing */
+        vtop--; /* NOT vpop() because on x86 it would flush the fp stack */
         vtop->r |= delayed_cast;
     }
 }
@@ -5529,7 +5864,16 @@ void inc(int post, int c)
         vpop(); /* Return the cached historical value snapshot if a postfix execution is triggered */
 }
 
-/* Parse GNUC __attribute__ extensions and bind metadata directly into active AttributeDef frames */
+/* 28/07/2026 - TCC 0.9.23 */
+
+/* Parse GNUC __attribute__ extension. Currently, the following
+   extensions are recognized:
+   - aligned(n) : set data/function alignment.
+   - packed : force data alignment to 1
+   - section(x) : generate data/code in this section.
+   - unused : currently ignored, but may be used someday.
+   - regparm(n) : pass function parameters in registers (i386 only)
+ */
 static void parse_attribute(AttributeDef *ad)
 {
     int t, n;
@@ -5567,6 +5911,12 @@ static void parse_attribute(AttributeDef *ad)
                 }
                 ad->aligned = n;
                 break;
+            /* 28/07/2026 - TCC 0.9.23 */
+            case TOK_PACKED1:
+            case TOK_PACKED2:
+                ad->packed = 1;
+                break;
+            /* .... */
             case TOK_UNUSED1:
             case TOK_UNUSED2:
             case TOK_NORETURN1:
@@ -5583,14 +5933,54 @@ static void parse_attribute(AttributeDef *ad)
             case TOK_STDCALL3:
                 ad->func_call = FUNC_STDCALL;
                 break;
+
+            /* 28/07/2026 - TCC 0.9.23 */
+#ifdef TCC_TARGET_I386
+            case TOK_REGPARM1:
+            case TOK_REGPARM2:
+                skip('(');
+                n = expr_const();
+                if (n > 3) 
+                    n = 3;
+                else if (n < 0)
+                    n = 0;
+                if (n > 0)
+                    ad->func_call = FUNC_FASTCALL1 + n - 1;
+                skip(')');
+                break;
+            /* 30/07/2026 - TCC 0.9.24 - tcc.c */ 
+            // case TOK_FASTCALL1:
+            // case TOK_FASTCALL2:
+            // case TOK_FASTCALL3:
+            ////  FUNC_CALL(ad->func_attr) = FUNC_FASTCALLW;
+            //    ad->func_call = FUNC_FASTCALLW; /* 30/07/2026 */
+            //    break;            
+#endif
             default:
+                /* 28/07/2026 - TCC 0.9.23 */
+                if (tcc_state->warn_unsupported)  /* 29/07/2026 */
+                    warning("'%s' attribute ignored", get_tok_str(t, NULL));
+
                 /* Safely consume parametric trailing tokens matching unknown GNU extensions */
+                // if (tok == '(') {
+                //    next();
+                //    while (tok != ')' && tok != -1)
+                //        next();
+                //    next();
+                // }
+                /* 30/07/2026 - TCC 0.9.24 - tcc.c */
+                /* skip parameters */
                 if (tok == '(') {
-                    next();
-                    while (tok != ')' && tok != -1)
-                        next();
-                    next();
+                   int parenthesis = 0;
+                   do {
+                      if (tok == '(') 
+                          parenthesis++;
+                      else if (tok == ')')
+                          parenthesis--;
+                      next();
+                   } while (parenthesis && tok != -1);
                 }
+                /* ...... */
                 break;
             }
             if (tok != ',')
@@ -5752,15 +6142,18 @@ static void struct_decl(CType *type, int u)
     }
 }
 
+/* 28/07/2026 - TCC 0.9.23 */
+
 /* Return 0 if no type declaration is encountered. Otherwise, return the parsed basic type and advance the token stream */
 static int parse_btype(CType *type, AttributeDef *ad)
 {
-    int t, u, type_found;
+    int t, u, type_found, typespec_found;
     Sym *s;
     CType type1;
 
     memset(ad, 0, sizeof(AttributeDef));
     type_found = 0;
+    typespec_found = 0; /* 28/07/2026 */
     t = 0;
     
     while(1) {
@@ -5779,6 +6172,7 @@ static int parse_btype(CType *type, AttributeDef *ad)
             if ((t & VT_BTYPE) != 0)
                 error("too many basic types");
             t |= u;
+            typespec_found = 1;  /* 28/07/2026 */
             break;
         case TOK_VOID:
             u = VT_VOID;
@@ -5788,13 +6182,15 @@ static int parse_btype(CType *type, AttributeDef *ad)
             goto basic_type;
         case TOK_INT:
             next();
+            typespec_found = 1;  /* 28/07/2026 */
             break;
         case TOK_LONG:
             next();
             if ((t & VT_BTYPE) == VT_DOUBLE) {
                 t = (t & ~VT_BTYPE) | VT_LDOUBLE;
             } else if ((t & VT_BTYPE) == VT_LONG) {
-                t = (t & ~VT_BTYPE) | VT_LLONG; /* Resolve continuous long long (64-bit integer) modifiers */
+                /* Resolve continuous long long (64-bit integer) modifiers */
+                t = (t & ~VT_BTYPE) | VT_LLONG; 
             } else {
                 u = VT_LONG;
                 goto basic_type1;
@@ -5809,7 +6205,8 @@ static int parse_btype(CType *type, AttributeDef *ad)
         case TOK_DOUBLE:
             next();
             if ((t & VT_BTYPE) == VT_LONG) {
-                t = (t & ~VT_BTYPE) | VT_LDOUBLE; /* Enforce x87 12-byte long double configurations if long double is found */
+                /* Enforce x87 12-byte long double configurations if long double is found */
+                t = (t & ~VT_BTYPE) | VT_LDOUBLE; 
             } else {
                 u = VT_DOUBLE;
                 goto basic_type1;
@@ -5829,14 +6226,25 @@ static int parse_btype(CType *type, AttributeDef *ad)
         /* Language native type qualifiers and layout modifiers */
         case TOK_CONST1:
         case TOK_CONST2:
-        case TOK_CONST3:
+        case TOK_CONST3:	/* 28/07/2026 */
+            t |= VT_CONSTANT;
+            next();
+            break;
         case TOK_VOLATILE1:
         case TOK_VOLATILE2:
-        case TOK_VOLATILE3:
-        case TOK_REGISTER:
+        case TOK_VOLATILE3:     /* 28/07/2026 */
+            t |= VT_VOLATILE;
+            next();
+            break;
+        // case TOK_REGISTER:
         case TOK_SIGNED1:
         case TOK_SIGNED2:
-        case TOK_SIGNED3:
+        case TOK_SIGNED3:       /* 28/07/2026 */
+            typespec_found = 1;
+	    t |= VT_SIGNED;
+	    next();
+	    break;
+        case TOK_REGISTER:      /* 28/07/2026 */
         case TOK_AUTO:
         case TOK_RESTRICT1:
         case TOK_RESTRICT2:
@@ -5846,6 +6254,7 @@ static int parse_btype(CType *type, AttributeDef *ad)
         case TOK_UNSIGNED:
             t |= VT_UNSIGNED;
             next();
+            typespec_found = 1;  /* 28/07/2026 */
             break;
 
         /* Variable storage persistence and structural scopes visibility qualifiers */
@@ -5880,6 +6289,10 @@ static int parse_btype(CType *type, AttributeDef *ad)
             parse_expr_type(&type1);
             goto basic_type2;
         default:
+            /* 28/07/2026 - TCC 0.9.23 */
+            if (typespec_found)
+                goto the_end;
+
             /* Evaluate custom user-defined types via typedef structural lookup chains */
             s = sym_find(tok);
             if (!s || !(s->type.t & VT_TYPEDEF))
@@ -5892,6 +6305,15 @@ static int parse_btype(CType *type, AttributeDef *ad)
         type_found = 1;
     }
 the_end:
+    /* 28/07/2026 - TCC 0.9.23 */
+    if ((t & (VT_SIGNED|VT_UNSIGNED)) == (VT_SIGNED|VT_UNSIGNED))
+      error("signed and unsigned modifier");
+    if (tcc_state->char_is_unsigned) {
+        if ((t & (VT_SIGNED|VT_UNSIGNED|VT_BTYPE)) == VT_BYTE)
+            t |= VT_UNSIGNED;
+    }
+    t &= ~VT_SIGNED;
+    /* ..... */
     /* Optimization rule: 'long' remains unrepresented as a raw isolated type internally; flatten it straight to standard 32-bit int */
     if ((t & VT_BTYPE) == VT_LONG)
         t = (t & ~VT_BTYPE) | VT_INT;
@@ -5899,15 +6321,22 @@ the_end:
     return type_found;
 }
 
+/* 28/07/2026 - TCC 0.9.23 */
+
 /* Convert a function parameter type dynamically (transforms array definitions to pointers and functions to function pointers) */
 static inline void convert_parameter_type(CType *pt)
 {
-    /* Array parameters must be implicitly transformed to pointers according to strict ANSI C semantics */
+    /* remove const and volatile qualifiers (XXX: const could be used
+       to indicate a const function parameter */
+    pt->t &= ~(VT_CONSTANT | VT_VOLATILE); /* 28/07/2026 */
+    /* array must be transformed to pointer according to ANSI C */
     pt->t &= ~VT_ARRAY;
     if ((pt->t & VT_BTYPE) == VT_FUNC) {
         mk_pointer(pt);
     }
 }
+
+/* 28/07/2026 - TCC 0.9.23 */
 
 /* Recursive postfix type parser resolving function signature parameters and array dimensional limits */
 static void post_type(CType *type, AttributeDef *ad)
@@ -5964,11 +6393,16 @@ static void post_type(CType *type, AttributeDef *ad)
         if (l == 0)
             l = FUNC_OLD;
         skip(')');
-        
+
         t1 = type->t & VT_STORAGE;
-        type->t &= ~VT_STORAGE;
+        // type->t &= ~VT_STORAGE;
+        /* 28/07/2026 - TCC 0.9.23 */
+        /* NOTE: const is ignored in returned type as it has a special
+           meaning in gcc / C++ */
+        type->t &= ~(VT_STORAGE | VT_CONSTANT); 
+
         post_type(type, ad);
-        
+
         /* Enqueue an anonymous field descriptor containing the validated function signature prototype metadata */
         s = sym_push(SYM_FIELD, type, ad->func_call, l);
         s->next = first;
@@ -5981,14 +6415,14 @@ static void post_type(CType *type, AttributeDef *ad)
         if (tok != ']') {
             n = expr_const();
             if (n < 0)
-                error("invalid array size");    
+                error("invalid array size");
         }
         skip(']');
-        
+
         t1 = type->t & VT_STORAGE;
         type->t &= ~VT_STORAGE;
         post_type(type, ad);
-        
+
         /* Enqueue an anonymous field descriptor mapping the array element component data boundaries */
         s = sym_push(SYM_FIELD, type, 0, n);
         type->t = t1 | VT_ARRAY | VT_PTR;
@@ -5996,32 +6430,40 @@ static void post_type(CType *type, AttributeDef *ad)
     }
 }
 
+/* 28/07/2026 - TCC 0.9.23 */
+
 /* Parse a type declaration sequence (excluding the basic type specification) and load it into 'type'.
    'td' acts as a directional bitmask flag identifying abstract or direct variable identifiers. */
 static void type_decl(CType *type, AttributeDef *ad, int *v, int td)
 {
     Sym *s;
     CType type1, *type2;
-
+    int qualifiers;
+    /* 28/07/2026 */
     while (tok == '*') {
-        next();
+        qualifiers = 0;
     redo:
+        next();
         switch(tok) {
         case TOK_CONST1:
         case TOK_CONST2:
         case TOK_CONST3:
+            qualifiers |= VT_CONSTANT;
+            goto redo;
         case TOK_VOLATILE1:
         case TOK_VOLATILE2:
         case TOK_VOLATILE3:
+            qualifiers |= VT_VOLATILE;
+            goto redo;
         case TOK_RESTRICT1:
         case TOK_RESTRICT2:
         case TOK_RESTRICT3:
-            next();
             goto redo;
         }
         mk_pointer(type);
+        type->t |= qualifiers;
     }
-    
+
     if (tok == TOK_ATTRIBUTE1 || tok == TOK_ATTRIBUTE2)
         parse_attribute(ad);
 
@@ -6048,10 +6490,10 @@ static void type_decl(CType *type, AttributeDef *ad, int *v, int td)
     
     if (tok == TOK_ATTRIBUTE1 || tok == TOK_ATTRIBUTE2)
         parse_attribute(ad);
-        
+
     if (!type1.t)
         return;
-        
+
     /* Chain and append newly resolved types at the absolute end of the recursive type1 layout map */
     type2 = &type1;
     for(;;) {
@@ -6101,15 +6543,17 @@ static void indir(void)
     }
 }
 
-/* Push a type-safe parameter configuration onto the target function argument pipeline layout */
-void gfunc_param_typed(GFuncContext *gf, Sym *func, Sym *arg)
+/* 28/07/2026 - TCC 0.9.23 */
+/* Pass a parameter to a function and do type checking and casting */
+static void gfunc_param_typed(Sym *func, Sym *arg)
 {
     int func_type;
     CType type;
 
     func_type = func->c;
-    if (func_type == FUNC_OLD || (func_type == FUNC_ELLIPSIS && arg == NULL)) {
-        /* Default casting behavior: Enforce automatic promotion mapping isolated float registers to doubles */
+    if (func_type == FUNC_OLD ||
+        (func_type == FUNC_ELLIPSIS && arg == NULL)) {
+        /* default casting : only need to convert float to double */
         if ((vtop->type.t & VT_BTYPE) == VT_FLOAT) {
             type.t = VT_DOUBLE;
             gen_cast(&type);
@@ -6117,13 +6561,9 @@ void gfunc_param_typed(GFuncContext *gf, Sym *func, Sym *arg)
     } else if (arg == NULL) {
         error("too many arguments to function");
     } else {
-        gen_assign_cast(&arg->type);
-    }
-    
-    if (!nocode_wanted) {
-        gfunc_param(gf);
-    } else {
-        vpop();
+        type = arg->type;
+        type.t &= ~VT_CONSTANT; /* need to do that to avoid false warning */
+        gen_assign_cast(&type);
     }
 }
 
@@ -6142,6 +6582,18 @@ static void parse_expr_type(CType *type)
     skip(')');
 }
 
+/* 29/07/2026 - TCC 0.9.23 */
+static void parse_type(CType *type)
+{
+    AttributeDef ad;
+    int n;
+
+    if (!parse_btype(type, &ad)) {
+        expect("type");
+    }
+    type_decl(type, &ad, &n, TYPE_ABSTRACT);
+}
+
 /* Rapidly push the current active constant value snapshot from the lexical token parser block */
 static void vpush_tokc(int t)
 {
@@ -6150,13 +6602,15 @@ static void vpush_tokc(int t)
     vsetc(&type, VT_CONST, &tokc);
 }
 
+/* 28/07/2026 - TCC 0.9.23 */
+
 /* Parse a primary or unary expression sequence handling data primitives, casts, and pointer references */
 static void unary(void)
 {
     int n, t, align, size, r;
     CType type;
     Sym *s;
-    GFuncContext gf;
+    // GFuncContext gf;
     AttributeDef ad;
 
  tok_next:
@@ -6224,6 +6678,9 @@ static void unary(void)
         /* Process and instantiate continuous static raw string character data arrays */
         t = VT_BYTE;
     str_init:
+        /* 28/07/2026 - TCC 0.9.23 */	
+        if (tcc_state->warn_write_strings)
+           t |= VT_CONSTANT;
         type.t = t;
         mk_pointer(&type);
         type.t |= VT_ARRAY;
@@ -6238,12 +6695,13 @@ static void unary(void)
             skip(')');
             /* Check and process standard ISO C99 compound literal constructs */
             if (tok == '{') {
+                /* data is allocated locally by default */
                 if (global_expr)
                     r = VT_CONST;
                 else
                     r = VT_LOCAL;
                 
-                /* Enforce rules: All compound configurations evaluate as lvalues except raw arrays */
+                /* All compound configurations evaluate as lvalues except raw arrays */
                 if (!(type.t & VT_ARRAY))
                     r |= lvalue_type(type.t);
                 memset(&ad, 0, sizeof(AttributeDef));
@@ -6270,7 +6728,7 @@ static void unary(void)
     case '&':
         next();
         unary();
-        /* Assert operand validation: Function names and array structures bypass classical lvalue traits */
+        /* Function names and array structures bypass classical lvalue traits */
         if ((vtop->type.t & VT_BTYPE) != VT_FUNC && !(vtop->type.t & VT_ARRAY))
             test_lvalue();
         mk_pointer(&vtop->type);
@@ -6312,12 +6770,48 @@ static void unary(void)
             unary_type(&type);
         }
         size = type_size(&type, &align);
-        if (t == TOK_SIZEOF)
+        if (t == TOK_SIZEOF) {
+            /* 28/07/2026 - TCC 0.9.23 */
+            if (size < 0)
+                error("sizeof applied to an incomplete type");
             vpushi(size);
-        else
+        } else {
             vpushi(align);
+        }
         break;
-        
+
+    /* 28/07/2026 - TCC 0.9.23 */
+    case TOK_builtin_types_compatible_p:
+        {
+            CType type1, type2;
+            next();
+            skip('(');
+            parse_type(&type1);
+            skip(',');
+            parse_type(&type2);
+            skip(')');
+            type1.t &= ~(VT_CONSTANT | VT_VOLATILE);
+            type2.t &= ~(VT_CONSTANT | VT_VOLATILE);
+            vpushi(is_compatible_types(&type1, &type2));
+        }
+        break;
+    case TOK_builtin_constant_p:
+        {
+            int saved_nocode_wanted, res;
+            next();
+            skip('(');
+            saved_nocode_wanted = nocode_wanted;
+            nocode_wanted = 1;
+            gexpr();
+            res = (vtop->r & (VT_VALMASK | VT_LVAL | VT_SYM)) == VT_CONST;
+            vpop();
+            nocode_wanted = saved_nocode_wanted;
+            skip(')');
+            vpushi(res);
+        }
+        break;
+     /* ...... */
+
     case TOK_INC:
     case TOK_DEC:
         t = tok;
@@ -6364,9 +6858,32 @@ static void unary(void)
         if (!s) {
             if (tok != '(')
                 error("'%s' undeclared", get_tok_str(t, NULL));
+            /* 28/07/2026 - TCC 0.9.23 */
+            /* for simple function calls, we tolerate undeclared
+               external reference to int() function */
+            if (tcc_state->warn_implicit_function_declaration)
+                warning("implicit declaration of function '%s'", get_tok_str(t, NULL));
+            /* ..... */
             /* Toleration strategy: Allow undeclared external function linkage defaulting implicitly to int() */
             s = external_global_sym(t, &func_old_type, 0); 
         }
+
+        /* 28/07/2026 - TCC 0.9.23 */
+        if ((s->type.t & (VT_STATIC | VT_INLINE | VT_BTYPE)) ==
+            (VT_STATIC | VT_INLINE | VT_FUNC)) {
+            /* if referencing an inline function, then we generate a
+               symbol to it if not already done. It will have the
+               effect to generate code for it at the end of the
+               compilation unit. Inline function as always
+               generated in the text section. */
+            if (!s->c)
+                put_extern_sym(s, text_section, 0, 0);
+            r = VT_SYM | VT_CONST;
+        } else {
+            r = s->r;
+        }
+        /* ..... */
+
         vset(&s->type, s->r, s->c);
         /* If forward tracking reference is detected, redirect internal symbols directly to s */
         if (vtop->r & VT_SYM) {
@@ -6423,6 +6940,9 @@ static void unary(void)
             SValue ret;
             Sym *sa;
 
+            /* 28/07/2026 - TCC  0.9.23 */
+            int nb_args;
+
             /* Procedural Function Call Processing Engine */
             if ((vtop->type.t & VT_BTYPE) != VT_FUNC) {
                 if ((vtop->type.t & (VT_BTYPE | VT_ARRAY)) == VT_PTR) {
@@ -6437,80 +6957,36 @@ static void unary(void)
                 vtop->r &= ~VT_LVAL;
             }
             
+            /* get return type */
             s = vtop->type.ref;
-            if (!nocode_wanted) {
-                save_regs(0); /* Evacuate and cache active volatile working registers */
-                gfunc_start(&gf, s->r);
-            }
+            /* 28/07/2026 */
+            // if (!nocode_wanted) {
+            //    save_regs(0); /* Evacuate and cache active volatile working registers */
+            //    gfunc_start(&gf, s->r);
+            // }
             next();
             sa = s->next; /* Position tracking at first registered structural parameter cell */
-            
-#ifdef INVERT_FUNC_PARAMS
-            {
-                int parlevel;
-                Sym *args, *s1;
-                ParseState saved_parse_state;
-                TokenString str;
-                
-                /* Parse argument list caches pushing them onto target temporary stack sequentially */
-                args = NULL;
-                if (tok != ')') {
-                    for(;;) {
-                        tok_str_new(&str);
-                        parlevel = 0;
-                        while ((parlevel > 0 || (tok != ')' && tok != ',')) && tok != TOK_EOF) {
-                            if (tok == '(')
-                                parlevel++;
-                            else if (tok == ')')
-                                parlevel--;
-                            tok_str_add_tok(&str);
-                            next();
-                        }
-                        tok_str_add(&str, -1);
-                        tok_str_add(&str, 0);
-                        s1 = sym_push2(&args, 0, 0, (int)str.str);
-                        s1->next = sa;
-                        if (sa)
-                            sa = sa->next;
-                        if (tok == ')')
-                            break;
-                        skip(',');
-                    }
-                }
-                
-                /* Invert stack order to process parameters in reverse-sweeping target code blocks */
-                save_parse_state(&saved_parse_state);
-                while (args) {
-                    macro_ptr = (int *)args->c;
-                    next();
-                    expr_eq();
-                    if (tok != -1)
-                        expect("',' or ')'");
-                    gfunc_param_typed(&gf, s, args->next);
-                    s1 = args->prev;
-                    tok_str_free((int *)args->c);
-                    tcc_free(args);
-                    args = s1;
-                }
-                restore_parse_state(&saved_parse_state);
-            }
-#endif
+
+            /* 28/07/2026 */
+            nb_args = 0;
+
             /* Struct return ABI optimization: Pass the target output location pointer parameter implicitly */
+            /* 28/07/2026 */
             if ((s->type.t & VT_BTYPE) == VT_STRUCT) {
+                /* get some space for the returned structure */
                 size = type_size(&s->type, &align);
                 loc = (loc - size) & -align;
                 ret.type = s->type;
                 ret.r = VT_LOCAL | VT_LVAL;
-                
+                /* pass it as 'int' to avoid structure arg passing
+                   problems */
                 vseti(VT_LOCAL, loc);
                 ret.c = vtop->c;
-                if (!nocode_wanted)
-                    gfunc_param(&gf);
-                else
-                    vtop--;
+                nb_args++;
             } else {
                 ret.type = s->type; 
                 ret.r2 = VT_CONST;
+                /* return in register */
                 if (is_float(ret.type.t)) {
                     ret.r = REG_FRET; 
                 } else {
@@ -6520,11 +6996,14 @@ static void unary(void)
                 }
                 ret.c.i = 0;
             }
-#ifndef INVERT_FUNC_PARAMS
+
             if (tok != ')') {
                 for(;;) {
                     expr_eq();
-                    gfunc_param_typed(&gf, s, sa);
+                    // gfunc_param_typed(&gf, s, sa);
+                    gfunc_param_typed(s, sa);
+                    /* 28/07/2026 */
+                    nb_args++;
                     if (sa)
                         sa = sa->next;
                     if (tok == ')')
@@ -6532,14 +7011,18 @@ static void unary(void)
                     skip(',');
                 }
             }
-#endif
+
             if (sa)
                 error("too few arguments to function");
             skip(')');
             if (!nocode_wanted)
-                gfunc_call(&gf);
+                // gfunc_call(&gf);
+                /* 28/07/2026 */
+                gfunc_call(nb_args);
             else
-                vtop--;
+                // vtop--;
+                /* 28/07/2026 */
+                vtop -= (nb_args + 1);
                 
             /* Push and stabilize the final resulting function return value context */
             vsetc(&ret.type, ret.r, &ret.c);
@@ -7354,12 +7837,17 @@ static void decl_designator(CType *type, Section *sec, unsigned long c,
 #define EXPR_CONST 1
 #define EXPR_ANY   2
 
+/* 28/07/2026 - TCC 0.9.23 */
+
 /* Store an active value or evaluated expression directly inside a global section layout or local dynamic array */
 static void init_putv(CType *type, Section *sec, unsigned long c, int v, int expr_type)
 {
     int saved_global_expr, bt, bit_pos, bit_size;
     void *ptr;
     unsigned long long bit_mask;
+
+    /* 28/07/2026 */
+    CType dtype;
 
     switch(expr_type) {
     case EXPR_VAL:
@@ -7371,7 +7859,7 @@ static void init_putv(CType *type, Section *sec, unsigned long c, int v, int exp
         global_expr = 1;
         expr_const1();
         global_expr = saved_global_expr;
-        
+
         if ((vtop->r & (VT_VALMASK | VT_LVAL)) != VT_CONST)
             error("initializer element is not constant");
         break;
@@ -7379,13 +7867,20 @@ static void init_putv(CType *type, Section *sec, unsigned long c, int v, int exp
         expr_eq();
         break;
     }
+
+    /* 28/07/2026 - TCC 0.9.23 */
+    dtype = *type;
+    dtype.t &= ~VT_CONSTANT; /* need to do that to avoid false warning */
     
     if (sec) {
         /* Global storage execution branch: Assign types and process structural relocation boundaries */
-        gen_assign_cast(type);
+        // gen_assign_cast(type);
+        /* 28/07/2026 */
+        gen_assign_cast(&dtype);
+
         bt = type->t & VT_BTYPE;
         ptr = (void *)(sec->data + c);
-        
+
         if (!(type->t & VT_BITFIELD)) {
             bit_pos = 0;
             bit_size = 32;
@@ -7395,12 +7890,12 @@ static void init_putv(CType *type, Section *sec, unsigned long c, int v, int exp
             bit_size = (vtop->type.t >> (VT_STRUCT_SHIFT + 6)) & 0x3f;
             bit_mask = (1LL << bit_size) - 1;
         }
-        
+
         if ((vtop->r & VT_SYM) &&
             (bt == VT_BYTE || bt == VT_SHORT || bt == VT_DOUBLE ||
              bt == VT_LDOUBLE || bt == VT_LLONG || (bt == VT_INT && bit_size != 32)))
             error("initializer element is not computable at load time");
-            
+
         switch(bt) {
         case VT_BYTE:
             *(char *)ptr |= (vtop->c.i & bit_mask) << bit_pos;
@@ -7428,31 +7923,42 @@ static void init_putv(CType *type, Section *sec, unsigned long c, int v, int exp
         vtop--;
     } else {
         /* Local dynamic stack execution branch: Secure references and commit straight via vstore */
-        vset(type, VT_LOCAL, c);
+        // vset(type, VT_LOCAL, c);
+        /* 28/07/2026 */
+        vset(&dtype, VT_LOCAL, c);
         vswap();
         vstore();
         vpop();
     }
 }
 
+/* 28/07/2026 - TCC 0.9.23 */ 
+
 /* Inject zero-fill padding macros to execute dynamic variable-based block layout initialization */
 static void init_putz(CType *t, Section *sec, unsigned long c, int size)
 {
-    GFuncContext gf;
+    /* 28/07/2026 */
+    // GFuncContext gf;
 
     if (sec) {
         /* Bypassed completely for global contexts as the loader layout implicitly wipes standard BSS segments to zero */
     } else {
         /* Emit a high-fidelity continuous memset call to safely initialize local dynamic dynamic runtime storage */
-        gfunc_start(&gf, FUNC_CDECL);
-        vpushi(size);
-        gfunc_param(&gf);
-        vpushi(0);
-        gfunc_param(&gf);
-        vseti(VT_LOCAL, c);
-        gfunc_param(&gf);
+        // gfunc_start(&gf, FUNC_CDECL);
+        // vpushi(size);
+        // gfunc_param(&gf);
+        // vpushi(0);
+        // gfunc_param(&gf);
+        // vseti(VT_LOCAL, c);
+        // gfunc_param(&gf);
+        // vpush_global_sym(&func_old_type, TOK_memset);
+        // gfunc_call(&gf);
+        /* 28/07/2026 */
         vpush_global_sym(&func_old_type, TOK_memset);
-        gfunc_call(&gf);
+        vseti(VT_LOCAL, c);
+        vpushi(0);
+        vpushi(size);
+        gfunc_call(3);
     }
 }
 
@@ -7834,7 +8340,95 @@ static void func_decl_list(Sym *func_sym)
     }
 }
 
-/* Parse a data declaration or a function definition context. 
+/* 29/07/2026 - TCC 0.9.23 */
+/* parse a function defined by symbol 'sym' and generate its code in
+   'cur_text_section' */
+static void gen_function(Sym *sym)
+{
+    ind = cur_text_section->data_offset;
+    /* NOTE: we patch the symbol size later */
+    put_extern_sym(sym, cur_text_section, ind, 0);
+    funcname = get_tok_str(sym->v, NULL);
+    func_ind = ind;
+    /* put debug symbol */
+    // if (do_debug)
+    //    put_func_debug(sym);
+    /* push a dummy symbol to enable local sym storage */
+    sym_push2(&local_stack, SYM_FIELD, 0, 0);
+    gfunc_prolog(&sym->type);
+    rsym = 0;
+    block(NULL, NULL, NULL, NULL, 0, 0);
+    gsym(rsym);
+    gfunc_epilog();
+    cur_text_section->data_offset = ind;
+    label_pop(&global_label_stack, NULL);
+    sym_pop(&local_stack, NULL); /* reset local stack */
+    /* end of function */
+    /* patch symbol size */
+    ((Elf32_Sym *)symtab_section->data)[sym->c].st_size = 
+        ind - func_ind;
+    /* 29/07/2026 */
+    // if (do_debug) {
+    //    put_stabn(N_FUN, 0, 0, ind - func_ind);
+    // }
+    funcname = ""; /* for safety */
+    func_vt.t = VT_VOID; /* for safety */
+    ind = 0; /* for safety */
+}
+
+/* 29/07/2026 - TCC 0.9.23 */
+
+static void gen_inline_functions(void)
+{
+    Sym *sym;
+    CType *type;
+    int *str, inline_generated;
+
+    /* iterate while inline function are referenced */
+    for(;;) {
+        inline_generated = 0;
+        for(sym = global_stack; sym != NULL; sym = sym->prev) {
+            type = &sym->type;
+            if (((type->t & VT_BTYPE) == VT_FUNC) &&
+                (type->t & (VT_STATIC | VT_INLINE)) == 
+                (VT_STATIC | VT_INLINE) &&
+                sym->c != 0) {
+                /* the function was used: generate its code and
+                   convert it to a normal function */
+                str = (int *)sym->r;
+                sym->r = VT_SYM | VT_CONST;
+                type->t &= ~VT_INLINE;
+
+                macro_ptr = str;
+                next();
+                cur_text_section = text_section;
+                gen_function(sym);
+                macro_ptr = NULL; /* fail safe */
+
+                tok_str_free(str);
+                inline_generated = 1;
+            }
+        }
+        if (!inline_generated)
+            break;
+    }
+
+    /* free all remaining inline function tokens */
+    for(sym = global_stack; sym != NULL; sym = sym->prev) {
+        type = &sym->type;
+        if (((type->t & VT_BTYPE) == VT_FUNC) &&
+            (type->t & (VT_STATIC | VT_INLINE)) == 
+            (VT_STATIC | VT_INLINE)) {
+            str = (int *)sym->r;
+            tok_str_free(str);
+            sym->r = 0; /* fail safe */
+        }
+    }
+}
+
+/* 29/07/2026 - TCC 0.9.23 */
+
+/* Parse a data declaration or a function definition context.
    Parameter 'l' acts as a bitmask identifying default storage bounds (VT_LOCAL or VT_CONST) */
 static void decl(int l)
 {
@@ -7850,6 +8444,15 @@ static void decl(int l)
                 next();
                 continue;
             }
+
+            /* 28/07/2026 - TCC 0.9.23 */ 
+            if (l == VT_CONST &&
+                (tok == TOK_ASM1 || tok == TOK_ASM2 || tok == TOK_ASM3)) {
+                /* global asm block */
+                asm_global_instr();
+                continue;
+            }
+
             /* Legacy K&R fallback strategy: Tolerate missing explicit return type declarations for global structures */
             if (l == VT_LOCAL || tok < TOK_DEFINE)
                 break;
@@ -7865,6 +8468,8 @@ static void decl(int l)
             type_decl(&type, &ad, &v, TYPE_DIRECT);
 
             if ((type.t & VT_BTYPE) == VT_FUNC) {
+                /* if old style function prototype, we accept a
+                   declaration list */
                 sym = type.ref;
                 if (sym->c == FUNC_OLD)
                     func_decl_list(sym);
@@ -7876,51 +8481,79 @@ static void decl(int l)
                     error("cannot use local functions");
                 if (!(type.t & VT_FUNC))
                     expect("function definition");
+ 
+                /* 28/07/2026 - TCC 0.9.23 */
+                /* reject abstract declarators in function definition */
+                sym = type.ref;
+                while ((sym = sym->next) != NULL)
+                    if (!(sym->v & ~SYM_FIELD))
+                       expect("identifier");
                     
                 /* Optimize structural linkages translating inline declarations into static symbols if needed */
                 if ((type.t & (VT_EXTERN | VT_INLINE)) == (VT_EXTERN | VT_INLINE))
                     type.t = (type.t & ~VT_EXTERN) | VT_STATIC;
 
-                /* Compute text section mapping and calculate internal segment offsets */
-                cur_text_section = ad.section;
-                if (!cur_text_section)
-                    cur_text_section = text_section;
-
-                ind = cur_text_section->data_offset;
-                funcname = get_tok_str(v, NULL);
+		/* 29/07/2026 - TCC 0.9.23 */
                 sym = sym_find(v);
                 if (sym) {
+                    if ((sym->type.t & VT_BTYPE) != VT_FUNC)
+                        goto func_error1;
+                    /* specific case: if not func_call defined, we put
+                       the one of the prototype */
+                    /* XXX: should have default value */
+                    if (sym->type.ref->r != FUNC_CDECL &&
+                        type.ref->r == FUNC_CDECL)
+                        type.ref->r = sym->type.ref->r;
+                    if (!is_compatible_types(&sym->type, &type)) {
+                    func_error1:
+                        error("incompatible types for redefinition of '%s'", 
+                              get_tok_str(v, NULL));
+                    }
+                    /* if symbol is already defined, then put complete type */
                     sym->type = type;
                 } else {
+                    /* put function symbol */
                     sym = global_identifier_push(v, type.t, 0);
                     sym->type.ref = type.ref;
                 }
 
-                /* Commit function symbol entry straight into the output native ELF symbol tables map */
-                put_extern_sym(sym, cur_text_section, ind, 0);
-                func_ind = ind;
-                sym->r = VT_SYM | VT_CONST;
-
-                /* Push a dummy symbol layout descriptor to initialize local function variable boundaries safely */
-                sym_push2(&local_stack, SYM_FIELD, 0, 0);
-                gfunc_prolog(&type); /* Emit function entry prologue code blocks */
-                loc = 0;
-                rsym = 0;
-
-                block(NULL, NULL, NULL, NULL, 0, 0); /* Parse internal statement code execution blocks */
-                gsym(rsym);
-                gfunc_epilog(); /* Emit function epilogue machine code structures */
-
-                cur_text_section->data_offset = ind;
-                label_pop(&global_label_stack, NULL);
-                sym_pop(&local_stack, NULL); /* Reset and flush the localized function variable tracking stacks */
-
-                /* Post-patch compiled symbol payload size calculations straight into the native ELF headers */
-                ((Elf32_Sym *)symtab_section->data)[sym->c].st_size = ind - func_ind;
-
-                funcname = "";
-                func_vt.t = VT_VOID;
-                ind = 0;
+                /* static inline functions are just recorded as a kind
+                   of macro. Their code will be emitted at the end of
+                   the compilation unit only if they are used */
+                if ((type.t & (VT_INLINE | VT_STATIC)) == 
+                    (VT_INLINE | VT_STATIC)) {
+                    TokenString func_str;
+                    int block_level;
+                           
+                    tok_str_new(&func_str);
+                    
+                    block_level = 0;
+                    for(;;) {
+                        int t;
+                        if (tok == TOK_EOF)
+                            error("unexpected end of file");
+                        tok_str_add_tok(&func_str);
+                        t = tok;
+                        next();
+                        if (t == '{') {
+                            block_level++;
+                        } else if (t == '}') {
+                            block_level--;
+                            if (block_level == 0)
+                                break;
+                        }
+                    }
+                    tok_str_add(&func_str, -1);
+                    tok_str_add(&func_str, 0);
+                    sym->r = (int)func_str.str;
+                } else {
+                    /* compute text section */
+                    cur_text_section = ad.section;
+                    if (!cur_text_section)
+                        cur_text_section = text_section;
+                    sym->r = VT_SYM | VT_CONST;
+                    gen_function(sym);
+                }
                 break;
             } else {
                 if (btype.t & VT_TYPEDEF) {
@@ -7928,6 +8561,12 @@ static void decl(int l)
                     sym = sym_push(v, &type, 0, 0);
                     sym->type.t |= VT_TYPEDEF;
                 } else if ((type.t & VT_BTYPE) == VT_FUNC) {
+                    /* 29/07/2026 - TCC 0.9.23 */
+                    /* external function definition */
+                    /* specific case for func_call attribute */
+                    if (ad.func_call)
+                        type.ref->r = ad.func_call;
+                    /* ..... */
                     /* Register references identifying external function linkage boundaries */
                     external_sym(v, &type, 0);
                 } else {
@@ -7973,24 +8612,43 @@ static void preprocess_init(TCCState *s1)
 
 /* Master Pipeline Entry: Compile the standalone C source file registered inside 'file' descriptor.
    Returns non-zero value if semantic or compilation errors are caught. */
+/* 29/07/2026 - TCC 0.9.23 */
 static int tcc_compile(TCCState *s1)
 {
     Sym *define_start;
-    char buf;
+    char buf[512];
     volatile int section_sym;
 
-    /* Initialize active preprocessor states, macro tables and stack alignment structures */
     preprocess_init(s1);
 
     funcname = "";
     anon_sym = SYM_FIRST_ANOM;
-    section_sym = 0; 
 
-    /* Put localized file descriptor tracking details straight into the primary ELF symbol table text section */
-    put_elf_sym(symtab_section, 0, 0, ELF32_ST_INFO(STB_LOCAL, STT_FILE), 0, SHN_ABS, file->filename);
+    /* file info: full path + filename */
+    section_sym = 0; /* avoid warning */
 
-    /* Enforce initialization maps for frequently queried core type specifiers */
+    /* 29/07/2026 */
+    // if (do_debug) {
+    //  section_sym = put_elf_sym(symtab_section, 0, 0,
+    //                            ELF32_ST_INFO(STB_LOCAL, STT_SECTION), 0,
+    //                            text_section->sh_num, NULL);
+    //  getcwd(buf, sizeof(buf));
+    //  pstrcat(buf, sizeof(buf), "/");
+    //  put_stabs_r(buf, N_SO, 0, 0,
+    //              text_section->data_offset, text_section, section_sym);
+    //  put_stabs_r(file->filename, N_SO, 0, 0, 
+    //              text_section->data_offset, text_section, section_sym);
+    // }
+
+    /* an elf symbol of type STT_FILE must be put so that STB_LOCAL
+       symbols can be safely used */
+    put_elf_sym(symtab_section, 0, 0,
+                ELF32_ST_INFO(STB_LOCAL, STT_FILE), 0,
+                SHN_ABS, file->filename);
+
+    /* define some often used types */
     int_type.t = VT_INT;
+
     char_pointer_type.t = VT_BYTE;
     mk_pointer(&char_pointer_type);
 
@@ -7999,60 +8657,67 @@ static int tcc_compile(TCCState *s1)
 
     define_start = define_stack;
 
-    /* Secure Execution Shield: Completely bypass setjmp/longjmp error traps to guard register states.
-       Forcing error jump buf trackers off prevents processing flow from entering critical memory faults. */
-    s1->nb_errors = 0;
-    /* 29/07/2026 */
+    /* 30/07/2026 */
+    // if (setjmp(s1->error_jmp_buf) == 0) {
+        s1->nb_errors = 0;
+        // s1->error_set_jmp_enabled = 1;
+
+        ch = file->buf_ptr[0];
+        tok_flags = TOK_FLAG_BOL | TOK_FLAG_BOF;
+        parse_flags = PARSE_FLAG_PREPROCESS | PARSE_FLAG_TOK_NUM;
+        next();
+        decl(VT_CONST);
+        if (tok != TOK_EOF)
+            expect("declaration");
+
+        /* end of translation unit info */
+        /* 29/07/2026 */
+        // if (do_debug) {
+        //    put_stabs_r(NULL, N_SO, 0, 0,
+        //               text_section->data_offset, text_section, section_sym);
+        // }
+    // }
     // s1->error_set_jmp_enabled = 0;
 
-    /* Synchronize input buffer pointers tracking terminal end-of-file milestones */
-    ch = file->buf_ptr[0];
-    tok_flags = TOK_FLAG_BOL | TOK_FLAG_BOF;
-    parse_flags = PARSE_FLAG_PREPROCESS | PARSE_FLAG_TOK_NUM;
+    /* reset define stack, but leave -Dsymbols (may be incorrect if
+       they are undefined) */
+    free_defines(define_start);
 
-    next();
-    decl(VT_CONST); /* Launch the master parsing loop processing core syntax structures recursively */
+    gen_inline_functions();
 
-    if (tok != -1)
-        expect("declaration");
-
-    // s1->error_set_jmp_enabled = 0;
-
-    /* Recycle allocated macro tables freeing macro definitions up to milestone milestone */
-    free_defines(define_start); 
-
-    /* Clear and pop persistent symbol scopes from the global storage tracking lists safely */
     sym_pop(&global_stack, NULL);
+
     return s1->nb_errors != 0 ? -1 : 0;
 }
 
-#ifdef LIBTCC
-/* Compile a raw C code sequence directly out of a memory resident string wrapper */
-int tcc_compile_string(TCCState *s, const char *str)
-{
-    BufferedFile bf1, *bf = &bf1;
-    int ret, len;
-    char *buf;
-
-    bf->fd = -1;
-    len = strlen(str);
-    buf = tcc_malloc(len + 1);
-    if (!buf)
-        return -1;
-    memcpy(buf, str, len);
-    buf[len] = CH_EOB;
-    bf->buf_ptr = buf;
-    bf->buf_end = buf + len;
-    pstrcpy(bf->filename, sizeof(bf->filename), "<string>");
-    bf->line_num = 1;
-    file = bf;
-
-    ret = tcc_compile(s);
-    tcc_free(buf);
-
-    return ret;
-}
-#endif
+/* 23/07/2026 */
+// #ifdef LIBTCC
+// /* Compile a raw C code sequence directly out of a memory resident string wrapper */
+// int tcc_compile_string(TCCState *s, const char *str)
+// {
+//    BufferedFile bf1, *bf = &bf1;
+//    int ret, len;
+//    char *buf;
+//
+//    bf->fd = -1;
+//    len = strlen(str);
+//    buf = tcc_malloc(len + 1);
+//    if (!buf)
+//        return -1;
+//    memcpy(buf, str, len);
+//    buf[len] = CH_EOB;
+//    bf->buf_ptr = buf;
+//    bf->buf_end = buf + len;
+//    pstrcpy(bf->filename, sizeof(bf->filename), "<string>");
+//    bf->line_num = 1;
+//    file = bf;
+//
+//    ret = tcc_compile(s);
+//    tcc_free(buf);
+//
+//    return ret;
+// }
+// #endif
 
 /* Define a preprocessor symbol map layout injecting explicit value parameters if assignment is requested */
 void tcc_define_symbol(TCCState *s1, const char *sym, const char *value)
@@ -8128,6 +8793,8 @@ void tcc_undefine_symbol(TCCState *s1, const char *sym)
 // }
 // #endif
 
+/* 28/07/2026 - TCC.PRG 0.9.23 */
+
 /* Execute all runtime or linkage relocations (mandatory before utilizing tcc_get_symbol() loops) */
 int tcc_relocate(TCCState *s1)
 {
@@ -8149,7 +8816,10 @@ int tcc_relocate(TCCState *s1)
        Burada crt0.o ve main.c derlendi, tüm sembol açıkları olgunlaştı.
        Şimdi libc.a'yı tam bu satırda cımbızla taratıp eksikleri kapatıyoruz!
     */
-    tcc_link_libc_flat(s1);
+    // tcc_link_libc_flat(s1);
+    /* 28/07/2026 - TCC.PRG 0.9.23 */
+    if (!s1->nostdlib)
+       tcc_link_libc_flat(s1);
 
     relocate_common_syms();
 
@@ -8268,7 +8938,7 @@ TCCState *tcc_new(void)
     tcc_define_symbol(s, "__SIZE_TYPE__", "unsigned int");
     tcc_define_symbol(s, "__PTRDIFF_TYPE__", "int");
     tcc_define_symbol(s, "__WCHAR_TYPE__", "int");
-    
+
     /* Skip and reserve slot zero to shield system against section null pointers */
     dynarray_add((void ***)&s->sections, &s->nb_sections, NULL);
 
@@ -8278,8 +8948,13 @@ TCCState *tcc_new(void)
     bss_section = new_section(s, ".bss", SHT_NOBITS, SHF_ALLOC | SHF_WRITE);
 
     /* Construct primary standard linking stage ELF symbol tables maps */
-    symtab_section = new_symtab(s, ".symtab", SHT_SYMTAB, 0, ".strtab", ".hashtab", SHF_PRIVATE); 
+    symtab_section = new_symtab(s, ".symtab", SHT_SYMTAB, 0, ".strtab", ".hashtab", SHF_PRIVATE);
     strtab_section = symtab_section->link;
+
+   /* 29/07/2026 - TCC 0.9.23 */
+#ifdef CHAR_IS_UNSIGNED
+    s->char_is_unsigned = 1;
+#endif
     
     return s;
 }
@@ -8492,24 +9167,116 @@ int tcc_set_output_type(TCCState *s, int output_type)
     return 0;
 }
 
+/* 29/07/2026 - TCC 0.9.23 */
+#define WD_ALL    0x0001 /* warning is activated when using -Wall */
+#define FD_INVERT 0x0002 /* invert value before storing */
+
+typedef struct FlagDef {
+    uint16_t offset;
+    uint16_t flags;
+    const char *name;
+} FlagDef;
+
+static const FlagDef warning_defs[] = {
+    { offsetof(TCCState, warn_unsupported), 0, "unsupported" },
+    { offsetof(TCCState, warn_write_strings), 0, "write-strings" },
+    { offsetof(TCCState, warn_error), 0, "error" },
+    { offsetof(TCCState, warn_implicit_function_declaration), WD_ALL,
+      "implicit-function-declaration" },
+};
+
+static int set_flag(TCCState *s, const FlagDef *flags, int nb_flags,
+                    const char *name, int value)
+{
+    int i;
+    const FlagDef *p;
+    const char *r;
+
+    r = name;
+    if (r[0] == 'n' && r[1] == 'o' && r[2] == '-') {
+        r += 3;
+        value = !value;
+    }
+    for(i = 0, p = flags; i < nb_flags; i++, p++) {
+        if (!strcmp(r, p->name))
+            goto found;
+    }
+    return -1;
+ found:
+    if (p->flags & FD_INVERT)
+        value = !value;
+    *(int *)((uint8_t *)s + p->offset) = value;
+    return 0;
+}
+
+/* set/reset a warning */
+int tcc_set_warning(TCCState *s, const char *warning_name, int value)
+{
+    int i;
+    const FlagDef *p;
+
+    if (!strcmp(warning_name, "all")) {
+        for(i = 0, p = warning_defs; i < countof(warning_defs); i++, p++) {
+            if (p->flags & WD_ALL)
+                *(int *)((uint8_t *)s + p->offset) = 1;
+        }
+        return 0;
+    } else {
+        return set_flag(s, warning_defs, countof(warning_defs),
+                        warning_name, value);
+    }
+}
+
+static const FlagDef flag_defs[] = {
+    { offsetof(TCCState, char_is_unsigned), 0, "unsigned-char" },
+    { offsetof(TCCState, char_is_unsigned), FD_INVERT, "signed-char" },
+    { offsetof(TCCState, nocommon), FD_INVERT, "common" },
+    { offsetof(TCCState, leading_underscore), 0, "leading-underscore" },
+};
+
+/* set/reset a flag */
+int tcc_set_flag(TCCState *s, const char *flag_name, int value)
+{
+    return set_flag(s, flag_defs, countof(flag_defs),
+                    flag_name, value);
+}
+/* ..... */
+
 #if !defined(LIBTCC)
 
 /* Extract and return the localized chronological platform timer metric scaled in microseconds */
-static int64_t getclock_us(void)
+// static int64_t getclock_us(void)
+/* 23/07/2026 */
+static unsigned long getclock_us(void)
 {
-    struct timeval tv;
-    tv.tv_sec = 0;
-    tv.tv_usec = 0;
-    return tv.tv_sec * 1000000LL + tv.tv_usec;
+    // struct timeval tv;
+    // tv.tv_sec = 0;
+    // tv.tv_usec = 0;
+    // return tv.tv_sec * 1000000LL + tv.tv_usec;
+
+    /* TRDOS 386 v2.0.11 systime - get timer ticks (18.2 Hz) */
+    unsigned long ticks = 0;
+    __asm__ __volatile__ (
+        ".intel_syntax noprefix\n"
+        "mov eax, 13\n"
+        "mov ebx, 4\n"
+        "int 0x40\n"
+        "mov %0, eax\n"
+        ".att_syntax\n"
+        : "=r" (ticks)
+        :
+        : "eax","ebx"
+    );
+    return ticks;
 }
 
 /* 29/07/2026 */
 /* Print the primary operational command line argument parameters documentation guide directly to stdout */
 void help(void)
 {
-    printf("tcc version " TCC_VERSION " - Tiny C Compiler - Copyright (C) 2001, 2002 Fabrice Bellard\n" 
+    printf("tcc version " TCC_VERSION " - Tiny C Compiler - Copyright (C) 2001-2005 Fabrice Bellard\n" 
            "usage: tcc [-v] [-c] [-o outfile] [-Bdir] [-bench] [-Idir] [-Dsym[=val]] [-Usym]\n"
-           "           [-Ldir] [-llib] [infile1 infile2...]\n"
+           "           [-Wwarn] [-Ldir] [-llib] [infile1 infile2...]\n"
            "\n"
            "General options:\n"
            "  -v          display current version\n"
@@ -8517,6 +9284,9 @@ void help(void)
            "  -o outfile  set output filename\n"
            "  -Bdir       set tcc internal library path\n"
            "  -bench      output compilation statistics\n"
+           "  -fflag      set or reset (with 'no-' prefix) 'flag' (see man page)\n"
+           "  -Wwarning   set or reset (with 'no-' prefix) 'warning' (see man page)\n"
+           "  -w          disable all warnings\n"
            "Preprocessor options:\n"
            "  -Idir       add include path 'dir'\n"
            "  -Dsym[=val] define 'sym' with value 'val'\n"
@@ -8538,6 +9308,10 @@ typedef struct TCCOption {
     uint16_t flags;
 } TCCOption;
 
+/* 31/07/2026 */
+/* 29/07/2023 */
+/* 28/07/2026 - TCC 0.9.23 (Modified) */
+
 enum {
     TCC_OPTION_HELP,
     TCC_OPTION_I,
@@ -8548,20 +9322,20 @@ enum {
     TCC_OPTION_l,
     TCC_OPTION_bench,
     TCC_OPTION_c,
-    TCC_OPTION_static,
-    TCC_OPTION_shared,
     TCC_OPTION_o,
     TCC_OPTION_r,
     TCC_OPTION_W,
-    TCC_OPTION_O,
-    TCC_OPTION_m,
     TCC_OPTION_f,
     TCC_OPTION_nostdinc,
+    TCC_OPTION_nostdlib,
     TCC_OPTION_print_search_dirs,
-    TCC_OPTION_rdynamic,
-    TCC_OPTION_run,
     TCC_OPTION_v,
+    TCC_OPTION_w,
 };
+
+/* 31/07/2026 */
+/* 29/07/2023 */
+/* 28/07/2026 - TCC 0.9.23 (Modified) */
 
 /* Master operational command-line argument option matching lookup array matrix */
 static const TCCOption tcc_options[] = {
@@ -8575,21 +9349,29 @@ static const TCCOption tcc_options[] = {
     { "l", TCC_OPTION_l, TCC_OPTION_HAS_ARG | TCC_OPTION_NOSEP },
     { "bench", TCC_OPTION_bench, 0 },
     { "c", TCC_OPTION_c, 0 },
-    { "static", TCC_OPTION_static, 0 },
-    { "shared", TCC_OPTION_shared, 0 },
     { "o", TCC_OPTION_o, TCC_OPTION_HAS_ARG },
-    { "run", TCC_OPTION_run, 0 },
-    { "rdynamic", TCC_OPTION_rdynamic, 0 }, 
     { "r", TCC_OPTION_r, 0 },
     { "W", TCC_OPTION_W, TCC_OPTION_HAS_ARG | TCC_OPTION_NOSEP },
-    { "O", TCC_OPTION_O, TCC_OPTION_HAS_ARG | TCC_OPTION_NOSEP },
-    { "m", TCC_OPTION_m, TCC_OPTION_HAS_ARG },
     { "f", TCC_OPTION_f, TCC_OPTION_HAS_ARG | TCC_OPTION_NOSEP },
     { "nostdinc", TCC_OPTION_nostdinc, 0 },
+    { "nostdlib", TCC_OPTION_nostdlib, 0 },
     { "print-search-dirs", TCC_OPTION_print_search_dirs, 0 }, 
     { "v", TCC_OPTION_v, 0 },
     { NULL },
 };
+
+/* 29/07/2026 */
+void trdos_sys_exit(int exit_code) {
+    __asm__ __volatile__ (
+        ".intel_syntax noprefix\n"
+        "mov eax, 1\n"                 /* TRDOS kernel service index: sys_exit */
+        "int 0x40\n"                   /* Vector directly into Ring 0 */
+        ".att_syntax\n"
+        :
+        : "b" (exit_code)              /* Exit parameter */
+        : "eax"
+    ); 
+}
 
 /* 20/07/2026 - Google AI */
 /* =========================================================================
@@ -8641,17 +9423,25 @@ void check_undefined_symbols(TCCState *s1) {
                 printf("-> [TRDOS SHIELD]: Link aborted to prevent CPU Exception.\n");
                 
                 /* Ring 0 sys_exit(1) donanım kalkanını tetikle ve üretimi durdur */
-                __asm__ __volatile__ (
-                    ".intel_syntax noprefix\n"
-                    "mov ebx, 1\n"
-                    "mov eax, 1\n"
-                    "int 0x40\n"
-                    ".att_syntax\n"
-                );
+                // __asm__ __volatile__ (
+                //    ".intel_syntax noprefix\n"
+                //    "mov ebx, 1\n"
+                //    "mov eax, 1\n"
+                //    "int 0x40\n"
+                //    ".att_syntax\n"
+                // );
+
+                /* 31/07/2026 */
+                exit(1);	/* trdos_sys_exit(int exit_code) */
             }
         }
     }
 }
+
+/* 31/07/2026 */
+/* 29/07/2026 */
+/* 28/07/2026 - TCC 0.9.23 (Modified) */
+/* 24/07/2026 - TCC.PRG 0.9.18 */
 
 /* Master Executable Entry Point: Orchestrates the command-line argument pipeline and triggers compiler stages */
 int main(int argc, char **argv)
@@ -8680,14 +9470,18 @@ int main(int argc, char **argv)
         write(1, "  -v          display tcc version\r\n", 35);
         
         /* Forced Native TRDOS Exit Shield: Bypass terminal standard code returns via direct kernel interruption */
-        __asm__ __volatile__ (
-            ".intel_syntax noprefix\n"
-            "mov ebx, 0\n"
-            "mov eax, 1\n" /* sys_exit (1) vector invocation */
-            "int 0x40\n"
-            ".att_syntax\n"
-        );
-        return 0;
+        // __asm__ __volatile__ (
+        //    ".intel_syntax noprefix\n"
+        //    "mov ebx, 0\n"
+        //    "mov eax, 1\n" /* sys_exit (1) vector invocation */
+        //    "int 0x40\n"
+        //    ".att_syntax\n"
+        // );
+        // return 0;
+
+        /* 31/07/2026 */
+        exit(0);	/* trdos_sys_exit(int exit_code) */
+
     }
 
     /* Instantiate a fresh standalone state registry context block mapping core operational allocations */
@@ -8772,7 +9566,7 @@ int main(int argc, char **argv)
                     goto show_help;
                 optarg = NULL;
             }
-                
+
             switch(popt->index) {
             case TCC_OPTION_HELP:
             show_help:
@@ -8819,23 +9613,48 @@ int main(int argc, char **argv)
                 outfile = optarg; /* Kullanıcının belirlediği isim doğrudan yakalanır */
                 break;
             case TCC_OPTION_r:
+                /* generate a .o merging several output files */
                 reloc_output = 1;
                 output_type = TCC_OUTPUT_OBJ;
                 break;
             case TCC_OPTION_nostdinc:
                 s->nostdinc = 1;
                 break;
+            /* 28/07/2026 - TCC 0.9.23 */
+            case TCC_OPTION_nostdlib:
+                s->nostdlib = 1;
+                break;
             case TCC_OPTION_print_search_dirs:
                 print_search_dirs = 1;
                 break;
-            case TCC_OPTION_v:
-                write(1, "Tiny C Compiler version 0.9.18 for TRDOS 386\r\n", 46);
+            case TCC_OPTION_v:  /* 29/07/2026 */
+                write(1, "Tiny C Compiler version 0.9.23 for TRDOS 386\r\n", 46);
                 return 0;
+            /* 31/07/2026 */
+            case TCC_OPTION_f:
+                if (tcc_set_flag(s, optarg, 1) < 0 && s->warn_unsupported)
+                    goto unsupported_option;
+                break;
+            /* 29/07/2026 - TCC 0.9.23 */
+            case TCC_OPTION_W:
+                if (tcc_set_warning(s, optarg, 1) < 0 && 
+                    s->warn_unsupported)
+                    goto unsupported_option;
+                break;
+            /* 28/07/2026 - TCC 0.9.23 */
+            case TCC_OPTION_w:
+                s->warn_none = 1;
+                break;
             default:
+                if (s->warn_unsupported) {
+                unsupported_option:
+                    warning("unsupported option '%s'", r);
+                }
                 break;
             }
         }
     }
+    
     if (print_search_dirs) {
         printf("install: %s/\n", tcc_lib_path);
         return 0;
@@ -8850,7 +9669,7 @@ int main(int argc, char **argv)
         if (nb_libraries != 0)
             error("cannot specify libraries with -c");
     }
-    
+
     /* =========================================================================
        TRDOS DİNAMİK OTOMATİK ADLANDIRMA KANCASI (BSS VE LINKER_END BAĞIMSIZ)
        ========================================================================= */
@@ -8858,14 +9677,14 @@ int main(int argc, char **argv)
         char *ext;
         pstrcpy(objfilename, sizeof(objfilename) - 1, files[0]);
         ext = strrchr(objfilename, '.');
-        
+
         if (ext) {
             /* Eğer sadece nesne dosyası isteniyorsa uzantıyı .o yap */
             if (output_type == TCC_OUTPUT_OBJ) {
                 strcpy(ext + 1, "o");
             } else {
                 /* TRDOS 386 Flat Binary damgası için uzantıyı mutlak suretle PRG yapıyoruz */
-                strcpy(ext + 1, "PRG"); 
+                strcpy(ext + 1, "PRG");
             }
         } else {
             /* Eğer girdi dosyasının uzantısı yoksa sonuna doğrudan ekle */
@@ -9127,13 +9946,16 @@ int main(int argc, char **argv)
             }
 
             /* EXECUTE STEP E: Force absolute process escape returning directly to the shell prompt (sys_exit = 1) */
-            __asm__ __volatile__ (
-                ".intel_syntax noprefix\n"
-                "mov ebx, 0\n"
-                "mov eax, 1\n"
-                "int 0x40\n"
-                ".att_syntax\n"
-            );
+            // __asm__ __volatile__ (
+            //    ".intel_syntax noprefix\n"
+            //    "mov ebx, 0\n"
+            //    "mov eax, 1\n"
+            //    "int 0x40\n"
+            //    ".att_syntax\n"
+            // );
+            
+            /* 31/07/2026 */
+            exit(0);	/* trdos_sys_exit(int exit_code) */
         }
     }
 

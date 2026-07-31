@@ -26,7 +26,7 @@
 #else
 #ifndef __int8_t_defined
 #define __int8_t_defined
-typedef	char int8_t;
+typedef signed char int8_t;
 typedef	short int int16_t;
 typedef	int int32_t;
 typedef long long int int64_t;
@@ -217,6 +217,7 @@ typedef struct
    chances of collision with official or non-GNU unofficial values.  */
 
 #define EM_ALPHA	0x9026
+#define EM_C60          0x9c60
 
 /* Legal values for e_version (version).  */
 
@@ -399,6 +400,20 @@ typedef struct
    the end of a chain, meaning no further symbols are found in that bucket.  */
 
 #define STN_UNDEF	0		/* End of a chain.  */
+
+
+/* How to extract and insert information held in the st_other field.  */
+
+#define ELF32_ST_VISIBILITY(o)	((o) & 0x03)
+
+/* For ELF64 the definitions are the same.  */
+#define ELF64_ST_VISIBILITY(o)	ELF32_ST_VISIBILITY (o)
+
+/* Symbol visibility specification encoded in the st_other field.  */
+#define STV_DEFAULT	0		/* Default symbol visibility rules */
+#define STV_INTERNAL	1		/* Processor specific hidden class */
+#define STV_HIDDEN	2		/* Sym unavailable in other modules */
+#define STV_PROTECTED	3		/* Not preemptible, not exported */
 
 
 /* Relocation table entry without addend (in section of type SHT_REL).  */
@@ -1591,5 +1606,22 @@ typedef Elf32_Addr Elf32_Conflict;
 #define R_ARM_RBASE		255
 /* Keep this the last entry.  */
 #define R_ARM_NUM		256
+
+/* TMS320C67xx specific declarations */
+/* XXX: no ELF standard yet */
+
+/* TMS320C67xx relocs. */
+#define R_C60_32       1
+#define R_C60_GOT32	3		/* 32 bit GOT entry */
+#define R_C60_PLT32	4		/* 32 bit PLT address */
+#define R_C60_COPY	5		/* Copy symbol at runtime */
+#define R_C60_GLOB_DAT	6		/* Create GOT entry */
+#define R_C60_JMP_SLOT	7		/* Create PLT entry */
+#define R_C60_RELATIVE	8		/* Adjust by program base */
+#define R_C60_GOTOFF	9		/* 32 bit offset to GOT */
+#define R_C60_GOTPC	10		/* 32 bit PC relative offset to GOT */
+
+#define R_C60HI16      0x55       // high 16 bit MVKH embedded
+#define R_C60LO16      0x54       // low 16 bit MVKL embedded
 
 #endif	/* elf.h */
