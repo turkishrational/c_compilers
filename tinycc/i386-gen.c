@@ -18,10 +18,11 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
-/* 30/07/2026 - TCC 0.9.23 */
+/* 06/08/2026 */
+/* 04/08/2026 - TCC 0.9.24 - i386-gen.c - 31/03/2008 */ 
 
 /* number of available registers */
-#define NB_REGS      4
+#define NB_REGS     4
 
 /* a register can belong to several classes. The classes must be
    sorted from more general to more precise (see gv2() code which does
@@ -323,6 +324,7 @@ static void gcall_or_jmp(int is_jmp)
 }
 
 static uint8_t fastcall_regs[3] = { TREG_EAX, TREG_EDX, TREG_ECX };
+static uint8_t fastcallw_regs[2] = { TREG_ECX, TREG_EDX };
 
 /* Generate function call. The function address is pushed first, then
    all the parameters in call order. This functions pops all the
@@ -381,43 +383,31 @@ void gfunc_call(int nb_args)
     }
     save_regs(0); /* save used temporary registers */
     func_sym = vtop->type.ref;
+    // func_call = FUNC_CALL(func_sym->r);
+    /* 06/08/2026 - TCC 0.9.23 i386-gen.c */
     func_call = func_sym->r;
     /* fast call case */
-    if (func_call >= FUNC_FASTCALL1 && func_call <= FUNC_FASTCALL3) {
+    if ((func_call >= FUNC_FASTCALL1 && func_call <= FUNC_FASTCALL3) ||
+        func_call == FUNC_FASTCALLW) {
         int fastcall_nb_regs;
-        fastcall_nb_regs = func_call - FUNC_FASTCALL1 + 1;
+        uint8_t *fastcall_regs_ptr;
+        if (func_call == FUNC_FASTCALLW) {
+            fastcall_regs_ptr = fastcallw_regs;
+            fastcall_nb_regs = 2;
+        } else {
+            fastcall_regs_ptr = fastcall_regs;
+            fastcall_nb_regs = func_call - FUNC_FASTCALL1 + 1;
+        }
         for(i = 0;i < fastcall_nb_regs; i++) {
             if (args_size <= 0)
                 break;
-            o(0x58 + fastcall_regs[i]); /* pop r */
+            o(0x58 + fastcall_regs_ptr[i]); /* pop r */
             /* XXX: incorrect for struct/floats */
             args_size -= 4;
         }
     }
-    /* 30/07/2026 - TCC 0.9.24 - i386-gen.c */
-    /* fast call case */
-    // if ((func_call >= FUNC_FASTCALL1 && func_call <= FUNC_FASTCALL3) ||
-    //    func_call == FUNC_FASTCALLW) {
-    //    int fastcall_nb_regs;
-    //    uint8_t *fastcall_regs_ptr;
-    //    if (func_call == FUNC_FASTCALLW) {
-    //        fastcall_regs_ptr = fastcallw_regs;
-    //        fastcall_nb_regs = 2;
-    //    } else {
-    //        fastcall_regs_ptr = fastcall_regs;
-    //        fastcall_nb_regs = func_call - FUNC_FASTCALL1 + 1;
-    //    }
-    //    for(i = 0;i < fastcall_nb_regs; i++) {
-    //        if (args_size <= 0)
-    //            break;
-    //        o(0x58 + fastcall_regs_ptr[i]); /* pop r */
-    //        /* XXX: incorrect for struct/floats */
-    //        args_size -= 4;
-    //    }
-    // }
-    /* ...... */
     gcall_or_jmp(0);
-    if (args_size && func_sym->r != FUNC_STDCALL)
+    if (args_size && func_call != FUNC_STDCALL)
         gadd_sp(args_size);
     vtop--;
 }
@@ -433,36 +423,26 @@ void gfunc_prolog(CType *func_type)
 {
     int addr, align, size, func_call, fastcall_nb_regs;
     int param_index, param_addr;
+    uint8_t *fastcall_regs_ptr;
     Sym *sym;
     CType *type;
 
     sym = func_type->ref;
+    // func_call = FUNC_CALL(sym->r);
+    /* 06/08/2026 - TCC 0.9.23 i386-gen.c */
     func_call = sym->r;
     addr = 8;
     loc = 0;
     if (func_call >= FUNC_FASTCALL1 && func_call <= FUNC_FASTCALL3) {
         fastcall_nb_regs = func_call - FUNC_FASTCALL1 + 1;
+        fastcall_regs_ptr = fastcall_regs;
+    } else if (func_call == FUNC_FASTCALLW) {
+        fastcall_nb_regs = 2;
+        fastcall_regs_ptr = fastcallw_regs;
     } else {
         fastcall_nb_regs = 0;
+        fastcall_regs_ptr = NULL;
     }
-
-    /* 30/07/2026 - TCC 0.9.24 - i386-gen.c */
-    // sym = func_type->ref;
-    // func_call = FUNC_CALL(sym->r);
-    // addr = 8;
-    // loc = 0;
-    // if (func_call >= FUNC_FASTCALL1 && func_call <= FUNC_FASTCALL3) {
-    //    fastcall_nb_regs = func_call - FUNC_FASTCALL1 + 1;
-    //    fastcall_regs_ptr = fastcall_regs;
-    // } else if (func_call == FUNC_FASTCALLW) {
-    //    fastcall_nb_regs = 2;
-    //    fastcall_regs_ptr = fastcallw_regs;
-    // } else {
-    //    fastcall_nb_regs = 0;
-    //    fastcall_regs_ptr = NULL;
-    // }
-    /* ....... */
-
     param_index = 0;
 
     ind += FUNC_PROLOG_SIZE;
@@ -491,7 +471,7 @@ void gfunc_prolog(CType *func_type)
             /* save FASTCALL register */
             loc -= 4;
             o(0x89);     /* movl */
-            gen_modrm(fastcall_regs[param_index], VT_LOCAL, NULL, loc);
+            gen_modrm(fastcall_regs_ptr[param_index], VT_LOCAL, NULL, loc);
             param_addr = loc;
         } else {
             param_addr = addr;
@@ -507,11 +487,12 @@ void gfunc_prolog(CType *func_type)
         func_ret_sub = addr - 8;
 
     /* leave some room for bound checking code */
-    if (do_bounds_check) {
-        oad(0xb8, 0); /* lbound section pointer */
-        oad(0xb8, 0); /* call to function */
-        func_bound_offset = lbounds_section->data_offset;
-    }
+    /* 04/08/2026 - TCC.PRG 0.9.24 */
+    // if (do_bounds_check) {
+    //    oad(0xb8, 0); /* lbound section pointer */
+    //    oad(0xb8, 0); /* call to function */
+    //    func_bound_offset = lbounds_section->data_offset;
+    // }
 }
 
 /* generate function epilog */
@@ -519,39 +500,9 @@ void gfunc_epilog(void)
 {
     int v, saved_ind;
 
-#ifdef CONFIG_TCC_BCHECK
-    if (do_bounds_check && func_bound_offset != lbounds_section->data_offset) {
-        int saved_ind;
-        int *bounds_ptr;
-        Sym *sym, *sym_data;
-        /* add end of table info */
-        bounds_ptr = section_ptr_add(lbounds_section, sizeof(int));
-        *bounds_ptr = 0;
-        /* generate bound local allocation */
-        saved_ind = ind;
-        ind = func_sub_sp_offset;
-        sym_data = get_sym_ref(&char_pointer_type, lbounds_section, 
-                               func_bound_offset, lbounds_section->data_offset);
-        greloc(cur_text_section, sym_data,
-               ind + 1, R_386_32);
-        oad(0xb8, 0); /* mov %eax, xxx */
-        sym = external_global_sym(TOK___bound_local_new, &func_old_type, 0);
-        greloc(cur_text_section, sym, 
-               ind + 1, R_386_PC32);
-        oad(0xe8, -4);
-        ind = saved_ind;
-        /* generate bound check local freeing */
-        o(0x5250); /* save returned value, if any */
-        greloc(cur_text_section, sym_data,
-               ind + 1, R_386_32);
-        oad(0xb8, 0); /* mov %eax, xxx */
-        sym = external_global_sym(TOK___bound_local_delete, &func_old_type, 0);
-        greloc(cur_text_section, sym, 
-               ind + 1, R_386_PC32);
-        oad(0xe8, -4);
-        o(0x585a); /* restore returned value, if any */
-    }
-#endif
+    /* 04/08/2026 - TCC.PRG 0.9.24 */
+    /* .......... */
+
     o(0xc9); /* leave */
     if (func_ret_sub == 0) {
         o(0xc3); /* ret */
@@ -627,7 +578,8 @@ int gtst(int inv, int t)
             gsym(vtop->c.i);
         }
     } else {
-        if (is_float(vtop->type.t)) {
+        if (is_float(vtop->type.t) || 
+            (vtop->type.t & VT_BTYPE) == VT_LLONG) {
             vpushi(0);
             gen_op(TOK_NE);
         }

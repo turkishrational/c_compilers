@@ -18,6 +18,12 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
  */
 
+/* 06/08/2026 */
+/* 05/08/2026 */
+/* 04/08/2026 */
+/* 03/08/2026 */
+/* 02/08/2026 */
+/* 01/08/2026 - TCC.PRG 0.9.24 */
 /* 31/07/2026 */
 /* 30/07/2026 */
 /* 29/07/2026 */
@@ -192,8 +198,10 @@ typedef struct Section {
     struct Section *reloc;        /* Relocation tracking metadata table cross-link */
     struct Section *hash;         /* Associated direct lookup symbol hash table */
     struct Section *next;         /* Pointer to the next section descriptor in layout */
+    /* 01/08/2026 */
+    char name[16];
     /* 31/07/2026 - TCC 0.9.18 (0.9.23 Modified) */ 
-    char name[64];                /* Literal human-readable section name identifier */
+    // char name[64];             /* Literal human-readable section name identifier */
     /* 28/07/2026 - TCC 0.9.20-0.9.27 */
     // char name[1];              /* section name */
 } Section;
@@ -225,8 +233,9 @@ typedef struct AttributeDef {
 #define FUNC_FASTCALL1 2 /* first param in %eax */
 #define FUNC_FASTCALL2 3 /* first parameters in %eax, %edx */
 #define FUNC_FASTCALL3 4 /* first parameter in %eax, %edx, %ecx */
+/* 03/08/2026 */
 /* 30/07/2026 - TCC 0.9.24 - tcc.c */
-// #define FUNC_FASTCALLW 5 /* first parameter in %ecx, %edx */
+#define FUNC_FASTCALLW 5 /* first parameter in %ecx, %edx */
 
 /* Configuration assigned to the 'Sym.t' macro expansion processor */
 #define MACRO_OBJ      0          /* Standard object-like macro constant expansion block */
@@ -297,6 +306,8 @@ static int tok_flags;             /* Special analytical state modifiers tracking
 #define TOK_FLAG_BOL   0x0001     /* Token occupies absolute Beginning-Of-Line layout location */
 #define TOK_FLAG_BOF   0x0002     /* Token occupies absolute Beginning-Of-File layout location */
 #define TOK_FLAG_ENDIF 0x0004     /* Lexical block processing completed successfully matching ifdef */
+/* 03/08/2026 - TCC 0.9.24 */
+#define TOK_FLAG_EOF   0x0008 /* end of file */
 
 static int *macro_ptr, *macro_ptr_allocated;
 static int *unget_saved_macro_ptr;
@@ -358,8 +369,9 @@ static CType char_pointer_type, func_old_type, int_type;
 /* Fast lookup table determining valid identifier and numeric character scopes: true if isid(c) || isnum(c) */
 static unsigned char isidnum_table[256];
 
+/* 03/08/2026 */
 /* Compile with native debug symbol infrastructure support */
-static int do_debug = 0;
+// static int do_debug = 0;
 
 static int total_lines;
 static int total_bytes;
@@ -370,9 +382,10 @@ static int gnu_ext = 1;
 /* Enable native Tiny C specific compiler optimization extensions */
 static int tcc_ext = 1;
 
+/* 03/08/2026 */
 /* 08/07/2026 - Google AI */
-int do_bounds_check = 0;
-Section *lbounds_section = NULL;
+// int do_bounds_check = 0;
+// Section *lbounds_section = NULL;
 
 /* Core global pointer tracking active compiler state instance context */
 static struct TCCState *tcc_state;
@@ -463,9 +476,6 @@ struct TCCState {
 #define VT_LVAL_UNSIGNED 0x4000  /* Lvalue references an unsigned data type memory block */
 #define VT_LVAL_TYPE     (VT_LVAL_BYTE | VT_LVAL_SHORT | VT_LVAL_UNSIGNED)
 
-/* Core compilation language primitive type maps */
-#define VT_STRUCT_SHIFT 12   /* Hardware namespace isolation shift parameter for structure/enum records */
-
 #define VT_INT        0  /* Native 32-bit signed integer type */
 #define VT_BYTE       1  /* Native 8-bit signed byte integer type */
 #define VT_SHORT      2  /* Native 16-bit signed short integer type */
@@ -495,6 +505,11 @@ struct TCCState {
 #define VT_STATIC  0x00000100  /* Scope-restricted persistent internal storage visibility class */
 #define VT_TYPEDEF 0x00000200  /* Alias definition mapper overriding structural type descriptors */
 #define VT_INLINE  0x00000400  /* Inline expansion recommendation hint compiler optimization marker */
+
+/* Core compilation language primitive type maps */
+// #define VT_STRUCT_SHIFT 12 /* Hardware namespace isolation shift parameter for structure/enum records */
+/* 06/08/2026 */
+#define VT_STRUCT_SHIFT 16    /* shift for bitfield shift values */
 
 /* Bitmask filters extracting layout specifics */
 #define VT_STORAGE (VT_EXTERN | VT_STATIC | VT_TYPEDEF | VT_INLINE)
@@ -738,21 +753,21 @@ void vpushi(int v);
 /* 28/07/2026 - TCC 0.9.23 */
 void vrott(int n);
 void vset(CType *type, int r, int v);
-void type_to_str(char *buf, int buf_size, 
+void type_to_str(char *buf, int buf_size,
                  CType *type, const char *varstr);
 char *get_tok_str(int v, CValue *cv);
-static Sym *get_sym_ref(CType *type, Section *sec, 
+static Sym *get_sym_ref(CType *type, Section *sec,
                         unsigned long offset, unsigned long size);
 static Sym *external_global_sym(int v, CType *type, int r);
 
 /* Flat ELF/PRG Structured Section Generation Routines */
 static void section_realloc(Section *sec, unsigned long new_size);
 static void *section_ptr_add(Section *sec, unsigned long size);
-static void put_extern_sym(Sym *sym, Section *section, 
+static void put_extern_sym(Sym *sym, Section *section,
                            unsigned long value, unsigned long size);
 static void greloc(Section *s, Sym *sym, unsigned long addr, int type);
 static int put_elf_str(Section *s, const char *sym);
-static int put_elf_sym(Section *s, 
+static int put_elf_sym(Section *s,
                        unsigned long value, unsigned long size,
                        int info, int other, int shndx, const char *name);
 static int add_elf_sym(Section *s, unsigned long value, unsigned long size,
@@ -761,15 +776,19 @@ static void put_elf_reloc(Section *symtab, Section *s, unsigned long offset,
                           int type, int symbol);
 
 /* Technical Debug Tracking Traces Emission Engines (STABS) */
-static void put_stabs(const char *str, int type, int other, int desc, 
+static void put_stabs(const char *str, int type, int other, int desc,
                       unsigned long value);
-static void put_stabs_r(const char *str, int type, int other, int desc, 
+static void put_stabs_r(const char *str, int type, int other, int desc,
                         unsigned long value, Section *sec, int sym_index);
 static void put_stabn(int type, int other, int desc, int value);
 static void put_stabd(int type, int other, int desc);
 
 /* Native Core Filesystem Ingestion Engines */
-#define AFF_PRINT_ERROR     0x0001 /* Print explicit diagnostics if target source file is missing */
+#define AFF_PRINT_ERROR 0x0001 /* Print explicit diagnostics if target source file is missing */
+// #define AFF_REFERENCED_DLL 0x0002 /* load a referenced dll from another dll */
+/* 02/08/2026 */
+#define AFF_PREPROCESS  0x0004 /* preprocess file */
+
 static int tcc_add_file_internal(TCCState *s, const char *filename, int flags);
 
 /* 29/07/2026 - TCC 0.9.23 */
@@ -1454,6 +1473,8 @@ static void add_char(CString *cstr, int c)
     }
 }
 
+/* 03/08/2026 - TCC 0.9.24 */
+
 /* Translate active raw multi-precision internal tokens back to descriptive human-readable strings */
 char *get_tok_str(int v, CValue *cv)
 {
@@ -1515,6 +1536,10 @@ char *get_tok_str(int v, CValue *cv)
     case TOK_GT:
         v = '>';
         goto addv;
+    /* 03/08/2026 - TCC 0.9.24 */
+    case TOK_DOTS:
+        return strcpy(p, "...");
+    /* .... */ 
     case TOK_A_SHL:
         return strcpy(p, "<<=");
     case TOK_A_SAR:
@@ -3241,13 +3266,25 @@ static inline void next_nomacro1(void)
     parse_eof:
         {
             TCCState *s1 = tcc_state;
-            if (parse_flags & PARSE_FLAG_LINEFEED) {
+            // if (parse_flags & PARSE_FLAG_LINEFEED) {
+            //    tok = TOK_LINEFEED;
+            /* 03/08/2026 - TCC 0.9.24 */
+            if ((parse_flags & PARSE_FLAG_LINEFEED)
+                && !(tok_flags & TOK_FLAG_EOF)) {
+                tok_flags |= TOK_FLAG_EOF;
                 tok = TOK_LINEFEED;
+                goto keep_tok_flags;           
+            /* ...... */
             } else if (s1->include_stack_ptr == s1->include_stack ||
                        !(parse_flags & PARSE_FLAG_PREPROCESS)) {
                 /* Terminal milestone reached: No active files remaining on include stack layout */
                 tok = TOK_EOF;
             } else {
+                /* 03/08/2026 - TCC 0.9.24 */
+                tok_flags &= ~TOK_FLAG_EOF;
+                /* pop include file */
+                /* ...... */
+                /* test if previous '#endif' was after a #ifdef at start of file */
                 /* Restore historical file layout context from preprocessor stack frames */
                 if (tok_flags & TOK_FLAG_ENDIF) {
                     add_cached_include(s1, file->inc_type, file->inc_filename,
@@ -3255,6 +3292,7 @@ static inline void next_nomacro1(void)
                 }
 
                 /* Standard STABS debug tracking trace code completely siphoned away to maintain core static minimalism */
+                /* pop include stack */
                 tcc_close(file);
                 s1->include_stack_ptr--;
                 file = *s1->include_stack_ptr;
@@ -3265,15 +3303,23 @@ static inline void next_nomacro1(void)
         break;
 
     case '\n':
-        if (parse_flags & PARSE_FLAG_LINEFEED) {
-            tok = TOK_LINEFEED;
-        } else {
-            file->line_num++;
-            tok_flags |= TOK_FLAG_BOL;
-            p++;
+        // if (parse_flags & PARSE_FLAG_LINEFEED) {
+        //    tok = TOK_LINEFEED;
+        // } else {
+        //    file->line_num++;
+        //    tok_flags |= TOK_FLAG_BOL;
+        //    p++;
+        //    goto redo_no_start;
+        // }
+        // break;
+        /* 03/08/2026 - TCC 0.9.24 */
+        file->line_num++;
+        tok_flags |= TOK_FLAG_BOL;
+        p++;
+        if (0 == (parse_flags & PARSE_FLAG_LINEFEED))
             goto redo_no_start;
-        }
-        break;
+        tok = TOK_LINEFEED;
+        goto keep_tok_flags;
 
     case '#':
         PEEKC(c, p);
@@ -3287,7 +3333,14 @@ static inline void next_nomacro1(void)
                 p++;
                 tok = TOK_TWOSHARPS;
             } else {
-                tok = '#';
+                // tok = '#';
+                /* 03/08/2026 - TCC 0.9.24 */
+                if (parse_flags & PARSE_FLAG_ASM_COMMENTS) {
+                    p = parse_line_comment(p - 1);
+                    goto redo_no_start;
+                } else {
+                    tok = '#';
+                }
             }
         }
         break;
@@ -3298,7 +3351,7 @@ static inline void next_nomacro1(void)
     case 'm': case 'n': case 'o': case 'p':
     case 'q': case 'r': case 's': case 't':
     case 'u': case 'v': case 'w': case 'x':
-    case 'y': case 'z': 
+    case 'y': case 'z':
     case 'A': case 'B': case 'C': case 'D':
     case 'E': case 'F': case 'G': case 'H':
     case 'I': case 'J': case 'K': 
@@ -3357,7 +3410,9 @@ static inline void next_nomacro1(void)
         tok = ts->tok;
         break;
     case 'L':
-        t = (int)p;
+        // t = (int)p;
+        /* 03/08/2026 */
+        t = p[1];
         if (t != '\\' && t != '\'' && t != '\"') {
             /* Fall back straight into the fast path if 'L' represents a standard isolated variable identifier */
             goto parse_ident_fast;
@@ -3492,7 +3547,7 @@ static inline void next_nomacro1(void)
             tok = TOK_GT;
         }
         break;
-        
+
     case '&':
         PEEKC(c, p);
         if (c == '&') {
@@ -3531,7 +3586,7 @@ static inline void next_nomacro1(void)
             tok = '+';
         }
         break;
-        
+
     case '-':
         PEEKC(c, p);
         if (c == '-') {
@@ -3548,7 +3603,7 @@ static inline void next_nomacro1(void)
         }
         break;
 
-PARSE2('!', '!', '=', TOK_NE)
+    PARSE2('!', '!', '=', TOK_NE)
     PARSE2('=', '=', '=', TOK_EQ)
     PARSE2('*', '*', '=', TOK_A_MUL)
     PARSE2('%', '%', '=', TOK_A_MOD)
@@ -3570,6 +3625,7 @@ PARSE2('!', '!', '=', TOK_NE)
         }
         break;
         
+        /* simple tokens */
     case '(':
     case ')':
     case '[':
@@ -3581,7 +3637,9 @@ PARSE2('!', '!', '=', TOK_NE)
     case ':':
     case '?':
     case '~':
-    case '$':
+    case '$': /* only used in assembler */
+    /* 03/08/2026 - TCC 0.9.24 */
+    case '@': /* dito */
         tok = c;
         p++;
         break;
@@ -3589,8 +3647,10 @@ PARSE2('!', '!', '=', TOK_NE)
         error("unrecognized character \\x%02x", c);
         break;
     }
-    file->buf_ptr = p;
     tok_flags = 0;
+    /* 03/08/2026 - TCC 0.9.24 */
+keep_tok_flags:
+    file->buf_ptr = p;
 }
 
 /* Return next token without macro substitution. Can read input layers directly from macro_ptr buffer */
@@ -5948,13 +6008,14 @@ static void parse_attribute(AttributeDef *ad)
                     ad->func_call = FUNC_FASTCALL1 + n - 1;
                 skip(')');
                 break;
-            /* 30/07/2026 - TCC 0.9.24 - tcc.c */ 
-            // case TOK_FASTCALL1:
-            // case TOK_FASTCALL2:
-            // case TOK_FASTCALL3:
-            ////  FUNC_CALL(ad->func_attr) = FUNC_FASTCALLW;
-            //    ad->func_call = FUNC_FASTCALLW; /* 30/07/2026 */
-            //    break;            
+            /* 03/08/2026 */
+            /* 30/07/2026 - TCC 0.9.24 - tcc.c */
+            case TOK_FASTCALL1:
+            case TOK_FASTCALL2:
+            case TOK_FASTCALL3:
+                ad->func_call = FUNC_FASTCALLW; /* 30/07/2026 */
+            //  FUNC_CALL(ad->func_attr) = FUNC_FASTCALLW;
+                break;
 #endif
             default:
                 /* 28/07/2026 - TCC 0.9.23 */
@@ -8690,6 +8751,186 @@ static int tcc_compile(TCCState *s1)
     return s1->nb_errors != 0 ? -1 : 0;
 }
 
+/* 02/08/2026 */
+#undef fopen
+extern int trdos_fopen(const char *filename, const char *mode);
+#define fopen trdos_fopen
+// #undef write
+extern int write(int fd, const void *buf, unsigned int count);
+#undef fclose
+extern int trdos_fclose(int fd);
+#define fclose trdos_fclose
+
+/* 04/08/2026 - Google AI */
+
+/* TCC Preprocessor Çıktısını TRDOS'a Uyarlama Filtresi */
+void trdos_write_pp_out(const char *str, FILE *out_file) {
+    while (*str) {
+        if (*str == '\n') {
+            // Sadece \n gördüğünde TRDOS için \r\n yazdır
+            fputc('\r', out_file);
+            fputc('\n', out_file);
+        } else if (*str != '\r') { 
+            // Çift \r oluşmasını engellemek için koruma
+            fputc(*str, out_file);
+        }
+        str++;
+    }
+}
+
+/* 01/08/2026 - Google AI */
+
+/* 01/08/2026 - Global Output Filename Descriptor for TRDOS 386 Emission Writer */
+static const char *outfile = NULL;
+
+/* 05/08/2026 */
+/* 04/08/2026 */
+
+/* Preprocess the current file standalone and handle output emissions via PURE UNREGISTERED WRITE CALLS */
+/* 02/08/2026 - TCC 0.9.24 Preprocessor - Argument Alignment Defect Fixed */
+/* 06/08/2026 - Google AI */
+static int tcc_preprocess(TCCState *s1)
+{
+    Sym *define_start;
+    int out_fd;
+    int write_to_file;
+    const char *tok_str;
+    int last_is_space;
+
+    /* =========================================================================
+       TRDOS 386 SECTOR-BUFFERED EMISSION LAYER (512 Byte Zırhlı Disk Tamponu)
+       ========================================================================= */
+    static char pp_buffer[512];
+    unsigned int pp_buf_idx = 0;
+
+    preprocess_init(s1);
+    define_start = define_stack;
+
+    out_fd = 1;
+    write_to_file = 0;
+
+    if (outfile && outfile[0] != '\0') {
+
+    /* TEST/DEBUG - 06/08/2026 */
+    /* ====================================== */
+    // unsigned int length;
+    // out_fd = (int)fopen(outfile, "r"); // 'test.c' : "tcc -E cpptest.c -o test.c" 
+    // if (out_fd <= 0) {
+    //    error_noabort("preprocessor error: cannot open output file '%s'", outfile);
+    //    free_defines(define_start);
+    //    return -1;
+    // } else {
+    //    write_to_file = 1;
+    // }
+    // if (out_fd > 2) {
+    //   char* buffer[33];
+    //   while (length = read(out_fd, *buffer, 32)) {
+    //          buffer[length]= '\0';
+    //          trdos_write_pp_out(*buffer, stdout);
+    //   }
+    // }
+    // return 0;
+    /* ====================================== */
+
+        out_fd = (int)fopen(outfile, "w");
+        if (out_fd <= 0) {
+            error_noabort("preprocessor error: cannot create output file '%s'", outfile);
+            free_defines(define_start);
+            return -1;
+        }
+        write_to_file = 1;
+    }
+
+    // Her preprocessor başlangıcında tamponu tamamen sıfırlıyoruz (Zero Fill)
+    unsigned int z;
+    for (z = 0; z < 512; z++) {
+        pp_buffer[z] = '\0';
+    }
+
+    ch = file->buf_ptr[0];
+
+    tok_flags = TOK_FLAG_BOL | TOK_FLAG_BOF;
+    // parse_flags = PARSE_FLAG_PREPROCESS | PARSE_FLAG_TOK_NUM;
+    /* 05/08/2026 - TCC 0.9.24 */
+    parse_flags = PARSE_FLAG_ASM_COMMENTS | PARSE_FLAG_PREPROCESS | PARSE_FLAG_LINEFEED;
+
+    last_is_space = 1;
+
+    next();
+    while (tok != TOK_EOF) {
+        tok_str = get_tok_str(tok, &tokc);
+        if (tok_str && tok_str[0] != '\0') {
+            unsigned int len;
+
+            /* 02/08/2026 */
+            if (tok == TOK_LINEFEED) {
+                last_is_space = 1;
+            } else {
+               /* 04/08/2026 - TCC 0.9.24 (Modified) */
+               if (!last_is_space) {
+                   /* BOŞLUK KARAKTERİNİ TAMPONA GÜVENLİ EKLEME */
+                   /* 06/08/2026 */
+                   if (out_fd > 2) {
+                       pp_buffer[pp_buf_idx++] = ' ';
+                       if (pp_buf_idx >= 512) {
+                           write(out_fd, pp_buffer, 512);
+                           for (z = 0; z < 512; z++) pp_buffer[z] = '\0';
+                           pp_buf_idx = 0;
+                       }
+                   } else {
+                       write(out_fd, " ", 1);
+                   }
+               }
+            }
+
+            len = 0;
+            while (tok_str[len]) {
+                len++;
+            }
+
+            /* 06/08/2026 - Google AI */
+            if (len > 0) {
+               if (out_fd > 2) {
+                  /* TOKEN KARAKTERLERİNİ TAMPONA SIRAYLA DOLDURMA */
+                  unsigned int i;
+                  for (i = 0; i < len; i++) {
+                      pp_buffer[pp_buf_idx++] = tok_str[i];
+                      
+                      // Tampon tam 512 bayt olunca (1 sektör) diske tek hamlede bas ve sıfırla
+                      if (pp_buf_idx >= 512) {
+                          write(out_fd, pp_buffer, 512);
+                          for (z = 0; z < 512; z++) pp_buffer[z] = '\0'; // Zero fill
+                          pp_buf_idx = 0;
+                      }
+                  }
+               } else {
+                  /* 04/08/2026 - Google AI */
+                  trdos_write_pp_out(tok_str, stdout);
+               }
+            }
+
+            /* 04/08/2026 */
+            last_is_space = 0;
+        }
+        next();
+    }
+
+    /* 06/08/2026 */
+    /* =========================================================================
+       FLUSH LAYER: Döngü bittiğinde tamponda kalan son kırıntıları diske mühürle
+       ========================================================================= */
+    if (write_to_file && pp_buf_idx > 0) {
+        write(out_fd, pp_buffer, pp_buf_idx);
+    }
+
+    if (write_to_file) {
+        fclose(out_fd);
+    }
+
+    free_defines(define_start); 
+    return 0;
+}
+
 /* 23/07/2026 */
 // #ifdef LIBTCC
 // /* Compile a raw C code sequence directly out of a memory resident string wrapper */
@@ -9020,14 +9261,17 @@ int tcc_add_sysinclude_path(TCCState *s1, const char *pathname)
     return 0;
 }
 
+/* 01/08/2026 - Google AI */
+
 /* Find source file type by evaluating extensions and route parameters straight to corresponding modules */
+/* 01/08/2026 - TCC 0.9.24 Preprocessor & FD Guard Integrated for TRDOS 386 */
 static int tcc_add_file_internal(TCCState *s1, const char *filename, int flags)
 {
     const char *ext, *filename1;
     Elf32_Ehdr ehdr;
     int fd, ret;
     BufferedFile *saved_file;
-    
+
     filename1 = strrchr(filename, '/');
     if (filename1)
         filename1++;
@@ -9047,11 +9291,24 @@ static int tcc_add_file_internal(TCCState *s1, const char *filename, int flags)
         goto fail1;
     }
 
-    if (!ext || !strcmp(ext, "c")) {
+    /* =========================================================================
+       CRITICAL PREPROCESSOR HOOK: Eğer -E bayrağı aktifse, uzantı ve ELF
+       analizlerini tamamen bypass et ve LIBC/Kernel zırhlı motorunu tetikle.
+       ========================================================================= */
+    /* 06/08/2026 */
+    if (s1->output_type == TCC_OUTPUT_PREPROCESS) {
+        ret = tcc_preprocess(s1);
+    /* 02/08/2026 */
+    // if (flags & AFF_PREPROCESS) {
+    //    ret = tcc_preprocess(s1);
+    } else if (!ext || !strcmp(ext, "c")) {
+        /* C file assumed */
         ret = tcc_compile(s1);
     } else if (!strcmp(ext, "S")) {
+        /* preprocessed assembler */ 
         ret = tcc_assemble(s1, 1);
     } else if (!strcmp(ext, "s")) {
+        /* non preprocessed assembler */
         ret = tcc_assemble(s1, 0);
     } else {
         fd = file->fd;
@@ -9060,7 +9317,7 @@ static int tcc_add_file_internal(TCCState *s1, const char *filename, int flags)
             goto fail;
         }
         lseek(fd, 0, SEEK_SET);
-        
+
         if (ehdr.e_ident[0] == ELFMAG0 &&
             ehdr.e_ident[1] == ELFMAG1 &&
             ehdr.e_ident[2] == ELFMAG2 &&
@@ -9073,17 +9330,15 @@ static int tcc_add_file_internal(TCCState *s1, const char *filename, int flags)
                 goto fail;
             }
         } else if (memcmp((char *)&ehdr, ARMAG, 8) == 0) {
-            file->line_num = 0;
+            file->line_num = 0; /* do not display line number if error */
             ret = tcc_load_archive(s1, fd);
         } else {
             ret = tcc_load_ldscript(s1);
             if (ret < 0) {
-                // error_noabort("unrecognized file type");
-		/* 17/07/2026 - Google AI - DEBUG */
-		/* CRITICAL DEBUG: Print the exact file name causing the type mismatch! */
+                /* 17/07/2026 - Google AI - DEBUG */
+                /* CRITICAL DEBUG: Print the exact file name causing the type mismatch! */
                 error_noabort("unrecognized file type for target: '%s'", filename);
-                
-		goto fail;
+                goto fail;
             }
         }
     }
@@ -9270,11 +9525,12 @@ static unsigned long getclock_us(void)
     return ticks;
 }
 
+/* 01/08/2026 - TCC 0.9.24 (Modified) */
 /* 29/07/2026 */
 /* Print the primary operational command line argument parameters documentation guide directly to stdout */
 void help(void)
 {
-    printf("tcc version " TCC_VERSION " - Tiny C Compiler - Copyright (C) 2001-2005 Fabrice Bellard\n" 
+    printf("tcc version " TCC_VERSION " - Tiny C Compiler - Copyright (C) 2001-2006 Fabrice Bellard\n" 
            "usage: tcc [-v] [-c] [-o outfile] [-Bdir] [-bench] [-Idir] [-Dsym[=val]] [-Usym]\n"
            "           [-Wwarn] [-Ldir] [-llib] [infile1 infile2...]\n"
            "\n"
@@ -9288,6 +9544,7 @@ void help(void)
            "  -Wwarning   set or reset (with 'no-' prefix) 'warning' (see man page)\n"
            "  -w          disable all warnings\n"
            "Preprocessor options:\n"
+           "  -E          preprocess only\n"
            "  -Idir       add include path 'dir'\n"
            "  -Dsym[=val] define 'sym' with value 'val'\n"
            "  -Usym       undefine 'sym'\n"
@@ -9308,8 +9565,9 @@ typedef struct TCCOption {
     uint16_t flags;
 } TCCOption;
 
+/* 01/08/2026 - TCC 0.9.24 */
 /* 31/07/2026 */
-/* 29/07/2023 */
+/* 29/07/2026 */
 /* 28/07/2026 - TCC 0.9.23 (Modified) */
 
 enum {
@@ -9331,10 +9589,13 @@ enum {
     TCC_OPTION_print_search_dirs,
     TCC_OPTION_v,
     TCC_OPTION_w,
+    TCC_OPTION_E, /* 01/08/2026 - TCC 0.9.24 Preprocessor Only bayrağı */
 };
 
+/* 04/08/2026 */
+/* 01/08/2026 - TCC 0.9.24 */
 /* 31/07/2026 */
-/* 29/07/2023 */
+/* 29/07/2026 */
 /* 28/07/2026 - TCC 0.9.23 (Modified) */
 
 /* Master operational command-line argument option matching lookup array matrix */
@@ -9357,6 +9618,8 @@ static const TCCOption tcc_options[] = {
     { "nostdlib", TCC_OPTION_nostdlib, 0 },
     { "print-search-dirs", TCC_OPTION_print_search_dirs, 0 }, 
     { "v", TCC_OPTION_v, 0 },
+    { "w", TCC_OPTION_w, 0 },
+    { "E", TCC_OPTION_E, 0 }, /* 01/08/2026 - Saf Onislemci tetikleyicisi */
     { NULL },
 };
 
@@ -9438,6 +9701,8 @@ void check_undefined_symbols(TCCState *s1) {
     }
 }
 
+/* 02/08/2026 */
+/* 01/08/2026 - TCC 0.9.24 (Modified) */
 /* 31/07/2026 */
 /* 29/07/2026 */
 /* 28/07/2026 - TCC 0.9.23 (Modified) */
@@ -9447,7 +9712,9 @@ void check_undefined_symbols(TCCState *s1) {
 int main(int argc, char **argv)
 {
     char *r;
-    int optind, output_type, multiple_files, i, reloc_output;
+    // int optind, output_type, multiple_files, i, reloc_output;
+    /* 02/08/2026 */
+    int optind, output_type, i, reloc_output;
     TCCState *s;
     char **files;
     // int nb_files, nb_libraries, nb_objfiles, dminus, ret;
@@ -9457,18 +9724,21 @@ int main(int argc, char **argv)
     char objfilename[256];  /* 29/07/2026 */
     int64_t start_time = 0;
     const TCCOption *popt;
-    const char *optarg, *p1, *r1, *outfile;
+    // const char *optarg, *p1, *r1, *outfile;
+    /* 01/08/2026 */
+    const char *optarg, *p1, *r1;
+
     int print_search_dirs;
 
     if (argc == 1) {
         /* Direct system write calls to display quick usage information efficiently without buffer flushes */
-        write(1, "Tiny C Compiler version 0.9.18 for TRDOS 386\r\n", 46);
+        write(1, "Tiny C Compiler version 0.9.24 for TRDOS 386\r\n", 46);
         write(1, "Usage: tcc [options] [infile1] [infile2]...\r\n", 45);
         write(1, "Options:\r\n", 10);
         write(1, "  -c          compile only (produce .o object file)\r\n", 53);
         write(1, "  -o outfile  set output file name (.PRG default)\r\n", 51);
         write(1, "  -v          display tcc version\r\n", 35);
-        
+
         /* Forced Native TRDOS Exit Shield: Bypass terminal standard code returns via direct kernel interruption */
         // __asm__ __volatile__ (
         //    ".intel_syntax noprefix\n"
@@ -9493,8 +9763,10 @@ int main(int argc, char **argv)
     /* Dün yapılan cerrahi temizliğe sadık kalıyoruz: Sadece OBJ ve PRG (Yerel Flat Binary) hatları aktiftir */
     output_type = TCC_OUTPUT_EXE; 
     optind = 1;
-    outfile = NULL;
-    multiple_files = 1;
+    /* 01/08/2026 */
+    // outfile = NULL;
+    /* 02/08/2026 */
+    // multiple_files = 1;
     /* 29/07/2026 */
     // dminus = 0;
     files = NULL;
@@ -9502,6 +9774,8 @@ int main(int argc, char **argv)
     nb_libraries = 0;
     reloc_output = 0;
     print_search_dirs = 0;
+    /* 02/08/2026 */
+    ret = 0;
 
     while (1) {
         if (optind >= argc) {
@@ -9516,11 +9790,12 @@ int main(int argc, char **argv)
             /* Enqueue input source file paths straight into the active compilation tracking array layout */
             dynarray_add((void ***)&files, &nb_files, r);
 
-            if (!multiple_files) {
-                optind--;
-                /* Break immediately if sequential file scanning limits are constrained */
-                break;
-            }
+            /* 02/08/2026 */
+            // if (!multiple_files) {
+            //    optind--;
+            //    /* Break immediately if sequential file scanning limits are constrained */
+            //    break;
+            // }
         } else {
             /* =========================================================================
                TRDOS NATIVE PURE FLAT COMMAND LINE ARGUMENT PARSING ENGINE
@@ -9567,6 +9842,7 @@ int main(int argc, char **argv)
                 optarg = NULL;
             }
 
+            /* 02/08/2026 - TCC 0.9.24 (Modified) */
             switch(popt->index) {
             case TCC_OPTION_HELP:
             show_help:
@@ -9605,11 +9881,11 @@ int main(int argc, char **argv)
                 do_bench = 1;
                 break;
             case TCC_OPTION_c:
-                multiple_files = 1;
+                // multiple_files = 1;
                 output_type = TCC_OUTPUT_OBJ;
                 break;
             case TCC_OPTION_o:
-                multiple_files = 1;
+                // multiple_files = 1;
                 outfile = optarg; /* Kullanıcının belirlediği isim doğrudan yakalanır */
                 break;
             case TCC_OPTION_r:
@@ -9627,8 +9903,8 @@ int main(int argc, char **argv)
             case TCC_OPTION_print_search_dirs:
                 print_search_dirs = 1;
                 break;
-            case TCC_OPTION_v:  /* 29/07/2026 */
-                write(1, "Tiny C Compiler version 0.9.23 for TRDOS 386\r\n", 46);
+            case TCC_OPTION_v:  /* 01/08/2026 */
+                write(1, "Tiny C Compiler version 0.9.24 for TRDOS 386\r\n", 46);
                 return 0;
             /* 31/07/2026 */
             case TCC_OPTION_f:
@@ -9637,13 +9913,18 @@ int main(int argc, char **argv)
                 break;
             /* 29/07/2026 - TCC 0.9.23 */
             case TCC_OPTION_W:
-                if (tcc_set_warning(s, optarg, 1) < 0 && 
-                    s->warn_unsupported)
+                if (tcc_set_warning(s, optarg, 1) < 0 && s->warn_unsupported)
                     goto unsupported_option;
                 break;
             /* 28/07/2026 - TCC 0.9.23 */
             case TCC_OPTION_w:
                 s->warn_none = 1;
+                break;
+            /* 02/08/2026 */
+            /* 01/08/2026 - TCC 0.9.24 Saf Preprocessor Modu */
+            case TCC_OPTION_E:
+                // multiple_files = 1;
+                output_type = TCC_OUTPUT_PREPROCESS; 
                 break;
             default:
                 if (s->warn_unsupported) {
@@ -9670,53 +9951,77 @@ int main(int argc, char **argv)
             error("cannot specify libraries with -c");
     }
 
+    /* 02/08/2026 - Google AI */
     /* =========================================================================
        TRDOS DİNAMİK OTOMATİK ADLANDIRMA KANCASI (BSS VE LINKER_END BAĞIMSIZ)
        ========================================================================= */
-    if (!outfile && nb_files > 0) {
-        char *ext;
-        pstrcpy(objfilename, sizeof(objfilename) - 1, files[0]);
-        ext = strrchr(objfilename, '.');
+    /* FIX: Eğer -E modu aktifse, otomatik PRG adlandırma mekanizmasını tamamen bypass et! */
 
-        if (ext) {
-            /* Eğer sadece nesne dosyası isteniyorsa uzantıyı .o yap */
-            if (output_type == TCC_OUTPUT_OBJ) {
-                strcpy(ext + 1, "o");
-            } else {
+    // if (output_type == TCC_OUTPUT_PREPROCESS) {
+       /* Preprocessor varsayılan olarak ekrana (NULL) basmalıdır,
+          kullanıcı -o belirttiyse zaten parser tarafından doldurulmuştur. */
+    // }
+    // else if (!outfile && nb_files > 0) {
+    /* 02/08/2026 */
+    if (output_type != TCC_OUTPUT_PREPROCESS) {
+       if (do_bench)
+          start_time = getclock_us();
+
+       if (!outfile && nb_files > 0) {
+           char *ext;
+           pstrcpy(objfilename, sizeof(objfilename) - 1, files[0]);
+           ext = strrchr(objfilename, '.');
+
+           if (ext) {
+              /* Eğer sadece nesne dosyası isteniyorsa uzantıyı .o yap */
+              if (output_type == TCC_OUTPUT_OBJ) {
+                  strcpy(ext + 1, "o");
+              } else {
                 /* TRDOS 386 Flat Binary damgası için uzantıyı mutlak suretle PRG yapıyoruz */
                 strcpy(ext + 1, "PRG");
-            }
-        } else {
-            /* Eğer girdi dosyasının uzantısı yoksa sonuna doğrudan ekle */
-            int len = strlen(objfilename);
-            if (output_type == TCC_OUTPUT_OBJ) {
-                pstrcat(objfilename, sizeof(objfilename), ".o");
-            } else {
-                pstrcat(objfilename, sizeof(objfilename), ".PRG");
-            }
-        }
-        outfile = objfilename;
+              }
+           } else {
+              /* Eğer girdi dosyasının uzantısı yoksa sonuna doğrudan ekle */
+              int len = strlen(objfilename);
+              if (output_type == TCC_OUTPUT_OBJ) {
+                 pstrcat(objfilename, sizeof(objfilename), ".o");
+              } else {
+                 pstrcat(objfilename, sizeof(objfilename), ".PRG");
+              }
+           }
+           outfile = objfilename;
+       }
     }
 
-    if (do_bench) {
-        start_time = getclock_us();
-    }
+    // if (do_bench) {
+    //    start_time = getclock_us();
+    // }
 
     /* Configure compiler system state targets and load baseline symbol environments */
     tcc_set_output_type(s, output_type);
 
     /* Process, compile, and sequence every specified target input file or archive library */
-    for(i = 0; i < nb_files; i++) {
+    // for(i = 0; i < nb_files; i++) {
+    for(i = 0; i < nb_files && ret == 0; i++) {
         const char *filename;
         filename = files[i];
-
-        if (filename[0] == '-') {
+        /* 02/08/2026 */
+        /* 01/08/2026 - TCC 0.9.24 Saf Preprocessor Modu Yönlendirmesi */
+        if (output_type == TCC_OUTPUT_PREPROCESS) {
+           /* tcc_add_file yerine doğrudan zırhlı internal fonksiyonu çağırıyoruz */
+           // if (tcc_add_file_internal(s, filename, 0) < 0) {
+           //    ret = 1;
+           //    goto the_end;
+           // }
+           if (tcc_add_file_internal(s, filename, AFF_PRINT_ERROR | AFF_PREPROCESS) < 0)
+               ret = 1;
+        } else if (filename[0] == '-') {
             if (tcc_add_library(s, filename + 2) < 0)
                 error("cannot find %s", filename);
         } else {
             if (tcc_add_file(s, filename) < 0) {
                 ret = 1;
-                goto the_end;
+                // goto the_end;
             }
         }
     }
@@ -9724,13 +10029,24 @@ int main(int argc, char **argv)
     /* ELF nesne formatı için burası bir boş stub olarak çalışır, flat büyümede files güvenle korunur */
     tcc_free(files);
 
+    /* 02/08/2026 */
+    // if (ret)
+    //    goto the_end;
+
+    /* 01/08/2026 - Eğer -E modu çalıştıysa, binary linker ve sembol kontrol mekanizmalarını tamamen bypass et */
+    // if (output_type == TCC_OUTPUT_PREPROCESS) {
+    /* 02/08/2026 */
+    if ((ret != 0) || (output_type == TCC_OUTPUT_PREPROCESS)) {
+        goto the_end; /* Çıktı üretildi, derleyiciyi korumalı modda temizce sonlandır */
+    }
+
     /* 19/07/2026 - Google AI */
     /* Resolve linear pointer references across newly initialized flat segments in RAM */
     /* LOKOMOTİF NEŞTERİ 1: -c modunda relocation kilitlenmesi atlanmalıdır! */
     if (output_type != TCC_OUTPUT_OBJ) {
         tcc_relocate(s);
-       /* 29/07/2026 */
-       check_undefined_symbols(s);
+        /* 29/07/2026 */
+        check_undefined_symbols(s);
     }
 
     /* 20/07/2026 - Google AI */
@@ -9775,7 +10091,7 @@ int main(int argc, char **argv)
                 Elf32_Ehdr ehdr;
                 Elf32_Shdr master_shdr;
                 unsigned char shstrtab_payload[56]; // GCC UYUMU: Tam 56 Byte Genişliğinde Dizi
-                
+
                 unsigned int text_len = text_section->data_offset;
                 unsigned int data_len = data_section ? data_section->data_offset : 0;
                 unsigned int current_offset = 52;
@@ -9832,10 +10148,10 @@ int main(int argc, char **argv)
                 if (actual_reloc_sec && reloc_data_size > 0) {
                     __asm__ __volatile__ (".intel_syntax noprefix\n mov eax, 4\n int 0x40\n .att_syntax\n" :: "b"(out_fd), "c"(actual_reloc_sec->data), "d"(reloc_data_size) : "eax");
                 }
-                
+
                 lseek(c_fd, shstrtab_off, SEEK_SET);
                 __asm__ __volatile__ (".intel_syntax noprefix\n mov eax, 4\n int 0x40\n .att_syntax\n" :: "b"(out_fd), "c"(shstrtab_payload), "d"(shstrtab_bytes) : "eax");
-                
+
                 /* =========================================================================
                    5. GÜVENLİ 0.9.27 SECTION HEADER ENJEKSİYONU (8 KARTLI TAM ŞEMA)
                    ========================================================================= */
@@ -9926,7 +10242,7 @@ int main(int argc, char **argv)
             /* EXECUTE STEP D: Safely finalize file transaction closing target handle (sys_close = 6) */
             __asm__ __volatile__ (
                 ".intel_syntax noprefix\n"
-                "mov eax, 6\n" 
+                "mov eax, 6\n"
                 "int 0x40\n"
                 ".att_syntax\n"
                 :
