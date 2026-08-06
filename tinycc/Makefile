@@ -3,9 +3,12 @@
 #
 include config.mak
 
-CFLAGS=-O2 -g -Wall
+CFLAGS+=-g -Wall
 ifndef CONFIG_WIN32
-LIBS=-ldl
+LIBS=-lm
+ifndef CONFIG_NOLDL
+LIBS+=-ldl
+endif
 BCHECK_O=bcheck.o
 endif
 CFLAGS_P=$(CFLAGS) -pg -static -DCONFIG_TCC_STATIC
@@ -16,6 +19,9 @@ ifeq ($(GCC_MAJOR),2)
 CFLAGS+=-m386 -malign-functions=0
 else
 CFLAGS+=-march=i386 -falign-functions=0 -fno-strict-aliasing
+ifneq ($(GCC_MAJOR),3)
+CFLAGS+=-Wno-pointer-sign -Wno-sign-compare
+endif
 endif
 
 DISAS=objdump -d
@@ -26,7 +32,7 @@ PROGS=tcc$(EXESUF)
 ifdef CONFIG_CROSS
 PROGS+=c67-tcc$(EXESUF) arm-tcc$(EXESUF)
 endif
-PROGS+=tiny_impdef$(EXESUF)
+PROGS+=tiny_impdef$(EXESUF) tiny_libmaker$(EXESUF)
 else
 ifeq ($(ARCH),i386)
 PROGS=tcc$(EXESUF)
@@ -60,7 +66,7 @@ test: test.ref test.out
 	@if diff -u test.ref test.out ; then echo "Auto Test OK"; fi
 
 tcctest.ref: tcctest.c 
-	$(CC) $(CFLAGS) -I. -o $@ $<
+	$(CC) $(CFLAGS) -w -I. -o $@ $<
 
 test.ref: tcctest.ref
 	./tcctest.ref > $@
@@ -158,23 +164,28 @@ c67-tcc$(EXESUF): tcc.c c67-gen.c tccelf.c tccasm.c tcctok.h libtcc.h tcccoff.c
 	$(CC) $(CFLAGS) -DTCC_TARGET_C67 -o $@ $< $(LIBS)
 
 arm-tcc$(EXESUF): tcc.c arm-gen.c tccelf.c tccasm.c tcctok.h libtcc.h
-	$(CC) $(CFLAGS) -DTCC_TARGET_ARM -o $@ $< $(LIBS)
+	$(CC) $(CFLAGS) -DTCC_TARGET_ARM -DTCC_ARM_EABI -o $@ $< $(LIBS)
 
 i386-win32-tcc$(EXESUF): tcc.c i386-gen.c tccelf.c tccasm.c i386-asm.c tcctok.h libtcc.h i386-asm.h tccpe.c
 	$(CC) $(CFLAGS) -DTCC_TARGET_PE -o $@ $< $(LIBS)
 
 # windows utilities
-tiny_impdef$(EXESUF): tiny_impdef.c
+tiny_impdef$(EXESUF): win32/tools/tiny_impdef.c
+	$(CC) $(CFLAGS) -o $@ $< -lkernel32
+tiny_libmaker$(EXESUF): win32/tools/tiny_libmaker.c
 	$(CC) $(CFLAGS) -o $@ $< -lkernel32
 
 # TinyCC runtime libraries
 ifdef CONFIG_WIN32
 # for windows, we must use TCC because we generate ELF objects
 LIBTCC1_OBJS=$(addprefix win32/lib/, crt1.o wincrt1.o dllcrt1.o dllmain.o chkstk.o) libtcc1.o
-LIBTCC1_CC=./tcc.exe -Bwin32
+LIBTCC1_CC=./tcc.exe -Bwin32 -DTCC_TARGET_PE
 else
 LIBTCC1_OBJS=libtcc1.o
 LIBTCC1_CC=$(CC)
+endif
+ifeq ($(ARCH),i386)
+LIBTCC1_OBJS+=alloca86.o alloca86-bt.o
 endif
 
 %.o: %.c
@@ -191,7 +202,7 @@ bcheck.o: bcheck.c
 
 install: tcc_install libinstall
 
-tcc_install: $(PROGS) tcc.1 libtcc1.a $(BCHECK_O) tcc-doc.html tcc.1
+tcc_install: $(PROGS) tcc.1 libtcc1.a $(BCHECK_O) tcc-doc.html
 	mkdir -p "$(bindir)"
 	$(INSTALL) -s -m755 $(PROGS) "$(bindir)"
 ifndef CONFIG_WIN32
@@ -217,7 +228,7 @@ ifdef CONFIG_WIN32
 endif
 
 clean:
-	rm -f *~ *.o *.a tcc tcc1 tcct tcc_g tcctest.ref *.bin *.i ex2 \
+	rm -f *~ *.o *.a tcc tcct tcc_g tcctest.ref *.bin *.i ex2 \
            core gmon.out test.out test.ref a.out tcc_p \
            *.exe *.lib tcc.pod libtcc_test \
            tcctest[1234] test[1234].out $(PROGS) win32/lib/*.o
@@ -237,7 +248,11 @@ libinstall: libtcc.a
 	$(INSTALL) -m644 libtcc.h "$(includedir)"
 
 libtcc.o: tcc.c i386-gen.c Makefile
+ifdef CONFIG_WIN32
+	$(CC) $(CFLAGS) -DTCC_TARGET_PE -DLIBTCC -c -o $@ $<
+else
 	$(CC) $(CFLAGS) -DLIBTCC -c -o $@ $<
+endif
 
 libtcc.a: libtcc.o 
 	$(AR) rcs $@ $^
@@ -282,11 +297,11 @@ cache: tcc_g
 
 # documentation and man page
 tcc-doc.html: tcc-doc.texi
-	texi2html -monolithic -number $<
+	-texi2html -monolithic -number $<
 
 tcc.1: tcc-doc.texi
-	./texi2pod.pl $< tcc.pod
-	pod2man --section=1 --center=" " --release=" " tcc.pod > $@
+	-./texi2pod.pl $< tcc.pod
+	-pod2man --section=1 --center=" " --release=" " tcc.pod > $@
 
 FILE=tcc-$(shell cat VERSION)
 
