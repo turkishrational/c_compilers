@@ -10,8 +10,10 @@
 .global _SearchPathA@24
 
 /* TCC El Sýkýþma / TRDOS LIBC Standart Köprü Giriþleri */
+.global _trdos_fopen /* 02/08/2026 */
 .global _fopen
 .global fopen
+.global _trdos_fclose /* 02/08/2026 */
 .global _fclose
 .global fclose
 
@@ -35,6 +37,7 @@ ___p__environ:
 /* =========================================================================
    1. SAF ASSEMBLER _fopen ÝNÞASI (+3 LIBC FD ZIRHI)
    ========================================================================= */
+_trdos_fopen:
 _fopen:
 fopen:
     push ebp
@@ -84,6 +87,7 @@ fopen:
 /* =========================================================================
    2. SAF ASSEMBLER _fclose ÝNÞASI (-3 LIBC FD RECOVERY)
    ========================================================================= */
+_trdos_fclose:
 _fclose:
 fclose:
     push ebp

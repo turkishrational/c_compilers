@@ -1,4 +1,5 @@
-/* 19/6/2026 - Google AI */
+/* 05/08/2026 */
+/* 19/06/2026 - Google AI */
 
 .intel_syntax noprefix
 
@@ -28,20 +29,20 @@
 .global _vsprintf
 .global __mingw_vsprintf
 .global _sprint
-/* 5/7/2026 */
+/* 05/07/2026 */
 .global _trdos_snprintf
 .global snprintf
 .global trdos_snprintf
 
 .text
 
-/* 18/6/2026 - Google AI */
+/* 18/06/2026 - Google AI */
 /* =========================================================================
    SCREEN CLUSTER BRIDGES - All route to our armored __print engine
    ========================================================================= */
 
 _printf:
-_trdos_print:		  /* 29/6/2026 */
+_trdos_print:		  /* 29/06/2026 */
 __mingw_printf:
     push ebp
     mov ebp, esp
@@ -91,7 +92,7 @@ __mingw_vfprintf:
     pop ebp
     ret
 
-/* 19/6/2026 - Google AI */
+/* 19/06/2026 - Google AI */
 /* -------------------------------------------------------------------------
    STRING CLUSTER BRIDGES - All route to our pure assembly _sprint engine
    ------------------------------------------------------------------------- */
@@ -108,7 +109,7 @@ __mingw_sprintf:
     pop ebp
     ret
 
-/* 5/7/2026 */
+/* 05/07/2026 */
 snprintf:
 _snprintf:
 trdos_snprintf:
@@ -160,7 +161,7 @@ __mingw_vsprintf:
     pop ebp
     ret
 
-/* 18/6/2026 - Google AI */
+/* 18/06/2026 - Google AI */
 /* =========================================================================
    BUFFERED FORMAT ENGINE (__print) - FLAT INFRASTRUCTURE
    ========================================================================= */
@@ -425,7 +426,7 @@ __print:
     pop ebp
     ret
 
-/* 18/6/2026 - Google AI */
+/* 18/06/2026 - Google AI */
 /* =========================================================================
    INLINE STRINGS (EMBEDDED INSIDE CODE SEGMENT FOR FLAT RUNTIME)
    ========================================================================= */
@@ -437,7 +438,7 @@ __print:
 .L_only_lf_str:       /* \n (10) - LF */
     .byte 10, 0
 
-/* 5/7/2026 - Google AI */
+/* 05/07/2026 - Google AI */
 /* ===================================================================
 ; PROTECTED MEMORY FORMAT ENGINE: _sprint (Size-Bounded Engine)
 ; ===================================================================
@@ -499,6 +500,10 @@ _sprint:
     cmp al, 37                  /* '%' -> %% senaryosu */
     je .L_s_write_char
 
+    /* 05/08/2026 */
+    cmp al, 117                 /* 'u' -> unsigned integer */
+    je .L_s_fmt_integer
+
 .L_s_unknown_format:
     /* Bilinmeyen belirteçlerde de taşma kontrolü yapıyoruz */
     cmp ecx, edx
@@ -506,7 +511,7 @@ _sprint:
     mov byte ptr [edi], 37      /* '%' karakterini tampona geri yaz */
     inc edi
     inc ecx
-    
+
     cmp ecx, edx
     jae .L_s_done
     stosb                       /* Bilinmeyen karakteri yaz (örn: '0') */
@@ -543,11 +548,15 @@ _sprint:
 
     cmp eax, 0
     jge .L_s_pos_int
-    
+
+    /* 05/08/2026 */
+    cmp byte ptr [esp+4], 117   /* 'u' (unsigned integer) */
+    je .L_s_pos_int
+
     /* Negatif sayı kontrolünde taşma koruması */
     cmp ecx, [ebp + 12]         /* EBP üzerinden orijinal edx/size sınırını kontrol et */
     jae .L_s_int_overflow_skip
-    
+
     neg eax
     mov byte ptr [edi], 45      /* '-' karakteri bas */
     inc edi
@@ -572,7 +581,7 @@ _sprint:
 
 .L_s_pop_int_loop:
     pop eax
-    
+
     /* Tampon sınırı kontrolü yapılarak rakamları bas */
     push ebx
     mov ebx, [esp + 8]          /* Yığından korunan genel sayacı çek (+offset ayarı) */
@@ -580,7 +589,7 @@ _sprint:
     cmp ebx, [ebp + 12]         /* Sınırı aştık mı? */
     pop ebx
     jae .L_s_skip_digit
-    
+
     add al, 48                  /* '0' karakterine dönüştür */
     stosb
 
@@ -590,7 +599,7 @@ _sprint:
 
     pop edx                     /* Genel sayacı geri yükle */
     add ecx, edx
-    
+
 .L_s_int_overflow_skip:
     pop edx
     pop eax
@@ -637,7 +646,7 @@ _sprint:
     cmp ebx, [ebp + 12]         /* Sınırı aştık mı? */
     pop ebx
     jae .L_s_hex_skip_store
-    
+
     stosb
     inc dword ptr [esp + 4]     /* Yığındaki kayıtlı ECX'i güncelle */
 
