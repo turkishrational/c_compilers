@@ -18,6 +18,7 @@
  *  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
 
+/* 04/08/2026 - TCC.PRG 0.9.24 */
 /* 29/07/2026 */
 /* 28/07/2026 - TCC.PRG 0.9.23 */
 /* 22/07/2026 */
@@ -93,6 +94,8 @@ static void rebuild_hash(Section *s, unsigned int nb_buckets)
     }
 }
 
+/* 04/08/2026 - TCC 0.9.24 */
+
 /* Push a new symbol specification directly into the target ELF symbol section layout */
 static int put_elf_sym(Section *s, unsigned long value, unsigned long size,
                        int info, int other, int shndx, const char *name)
@@ -123,6 +126,7 @@ static int put_elf_sym(Section *s, unsigned long value, unsigned long size,
         base = (int *)hs->data;
         
         if (ELF32_ST_BIND(info) != STB_LOCAL) {
+            /* add another hashing entry */
             nbuckets = base[0];
             h = elf_hash(name) % nbuckets;
             *ptr = base[2 + h];
@@ -130,7 +134,11 @@ static int put_elf_sym(Section *s, unsigned long value, unsigned long size,
             base[1]++;
             
             /* Expand hashing map dynamically if layout density exceeds optimal thresholds */
-            if (base[1] > 2 * nbuckets) {
+            // if (base[1] > 2 * nbuckets) {
+            /* 04/08/2026 - TCC 0.9.24 */
+            /* we resize the hash table */
+            hs->nb_hashed_syms++;
+            if (hs->nb_hashed_syms > 2 * nbuckets) {
                 rebuild_hash(s, 2 * nbuckets);
             }
         } else {
@@ -363,7 +371,7 @@ void relocate_syms(TCCState *s1, int do_run)
                     /* Query current dictionary to verify symbol existence before fallback processing loops */
                     // sym->st_value = resolve_sym(s1, name);
 		    /* 22/07/2026 */
-                       sym->st_value = 0;
+                    sym->st_value = 0;
                 } else if (sym->st_shndx == SHN_COMMON) {
                     /* Common data block layouts completely handled and processed by the primary allocator loops */
                 } else if (sym->st_shndx < SHN_LORESERVE) {

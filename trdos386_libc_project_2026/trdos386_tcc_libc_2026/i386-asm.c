@@ -18,6 +18,7 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
+/* 04/08/2026 - TCC.PRG 0.9.24 - i386-asm.c, 31/03/2008 */ 
 /* 30/07/2026 */
 /* 29/07/2026 */
 /* 28/07/2026 - TCC.PRG 0.9.23 */ 
@@ -114,10 +115,14 @@ typedef struct Operand {
     ExprValue e;
 } Operand;
 
+/* 04/08/2026 - TCC 0.9.24 - i386-asm.c */
 static const uint8_t reg_to_size[5] = {
+/*
     [OP_REG8] = 0,
     [OP_REG16] = 1,
     [OP_REG32] = 2,
+*/
+    0, 0, 1, 0, 2
 };
     
 #define WORD_PREFIX_OPCODE 0x66
@@ -157,15 +162,15 @@ static const uint8_t test_bits[NB_TEST_OPCODES] = {
  0x0f, /* g */
 };
 
-/* 30/07/2026 - TCC 0.9.24 - i386-asm.c */
-// static const uint8_t segment_prefixes[] = {
-// 0x26, /* es */
-// 0x2e, /* cs */
-// 0x36, /* ss */
-// 0x3e, /* ds */
-// 0x64, /* fs */
-// 0x65  /* gs */
-// };
+/* 04/08/2026 - TCC 0.9.24 - i386-asm.c */
+static const uint8_t segment_prefixes[] = {
+ 0x26, /* es */
+ 0x2e, /* cs */
+ 0x36, /* ss */
+ 0x3e, /* ds */
+ 0x64, /* fs */
+ 0x65  /* gs */
+};
 
 static const ASMInstr asm_instrs[] = {
 #define ALT(x) x
@@ -327,8 +332,10 @@ static void parse_operand(TCCState *s1, Operand *op)
                 if (tok != ',') {
                     op->reg2 = asm_parse_reg();
                 } 
-                skip(',');
-                op->shift = get_reg_shift(s1);
+                if (tok == ',') {
+                    next();
+                    op->shift = get_reg_shift(s1);
+                }
             }
             skip(')');
         }
@@ -426,7 +433,7 @@ static inline void asm_modrm(int reg, Operand *op)
 static void asm_opcode(TCCState *s1, int opcode)
 {
     const ASMInstr *pa;
-    int i, modrm_index, reg, v, op1, is_short_jmp;
+    int i, modrm_index, reg, v, op1, is_short_jmp, seg_prefix;
     int nb_ops, s, ss;
     Operand ops[MAX_OPERANDS], *pop;
     int op_type[3]; /* decoded op type */
@@ -434,6 +441,7 @@ static void asm_opcode(TCCState *s1, int opcode)
     /* get operands */
     pop = ops;
     nb_ops = 0;
+    seg_prefix = 0;
     for(;;) {
         if (tok == ';' || tok == TOK_LINEFEED)
             break;
@@ -442,19 +450,18 @@ static void asm_opcode(TCCState *s1, int opcode)
         }
         parse_operand(s1, pop);
 
-        /* 30/07/2026 - TCC 0.9.24 - i386-asm.c */
-        // if (tok == ':') {
-        //   if (pop->type != OP_SEG || seg_prefix) {
-        //       error("incorrect prefix");
-        //   }
-        //   seg_prefix = segment_prefixes[pop->reg];
-        //   next();
-        //   parse_operand(s1, pop);
-        //   if (!(pop->type & OP_EA)) {
-        //       error("segment prefix must be followed by memory reference");
-        //   }
-        // }
-
+        /* 04/08/2026 - TCC 0.9.24 - i386-asm.c */
+        if (tok == ':') {
+           if (pop->type != OP_SEG || seg_prefix) {
+               error("incorrect prefix");
+           }
+           seg_prefix = segment_prefixes[pop->reg];
+           next();
+           parse_operand(s1, pop);
+           if (!(pop->type & OP_EA)) {
+               error("segment prefix must be followed by memory reference");
+           }
+        }
         pop++;
         nb_ops++;
         if (tok != ',')
@@ -568,6 +575,8 @@ static void asm_opcode(TCCState *s1, int opcode)
     /* now generates the operation */
     if (pa->instr_type & OPC_FWAIT)
         g(0x9b);
+    if (seg_prefix)
+        g(seg_prefix);
 
     v = pa->opcode;
     if (v == 0x69 || v == 0x69) {
