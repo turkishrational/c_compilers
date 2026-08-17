@@ -1,1 +1,0 @@
-nasm -f win32 trdos386_libc_io.s -o libc_io.o

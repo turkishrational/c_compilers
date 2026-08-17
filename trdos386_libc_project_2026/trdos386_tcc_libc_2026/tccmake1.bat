@@ -1,1 +1,0 @@
-gcc -c tcc.c -o tcc.o -DTCC_TARGET_I386 -nostdlib -fPIC -fno-toplevel-reorder -mpreferred-stack-boundary=2
