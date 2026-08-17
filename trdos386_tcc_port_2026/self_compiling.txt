@@ -1,0 +1,22 @@
+"trdos386_tcc_prg_0_9_18_self_2026.zip" contains
+self-compiling (tcc.prg 0.9.18 and it's source code which can be compiled by
+itself) version of TCC 0.9.18 port to TRDOS 386.
+
+main compiler: gcc (TDM-GCC-32 mingw).. tccmake1o.bat & tccmake1p.bat
+self-compiling: TCC.PRG 0.9.18 (compiled by GCC or TCC.PRG's itself)
+self-compiled compiler name: TCCSELF.PRG
+self-compiling command: tcc tcc.c -o TCCSELF.PRG
+                        tccself tcc.c -o TCCSELF2.PRG (demonstration)
+                        tccself2 tcc.c -o TCCSELF3.PRG (demonstration)
+
+note:
+starter/launcher code: CRT0 ("crt0.o" in the LIB sub directory) ((elf32-object file))
+
+crt0.s: (GAS)
+"crt0.o" file contains "GCCRT0" signature at offset 2 of the code (and the PRG file)
+crt0.asm: (NASM)
+self-compiling "crt0.o" file contains "TCCRT0" signature
+
+offset 8 of the CRT0 code contains a dword number which is the end of bss address (_bss_end)
+
+library: "libc.a" (elf32-object files archive) ((in the LIB sub directory))
