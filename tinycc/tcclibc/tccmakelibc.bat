@@ -1,1 +1,0 @@
-tcc -ar libc.a printf.o string.o write.o
