@@ -1,6 +1,6 @@
 "trdos386_tcc_prg_0_9_24_self_2026.zip" contains
 self-compiling (tcc.prg 0.9.24 and it's source code which can be compiled by
-itself) version of TCC 0.9.24port to TRDOS 386.
+itself) version of TCC 0.9.24 port to TRDOS 386.
 
 main compiler: gcc (TDM-GCC-32 mingw).. tccmake1o.bat & tccmake1p.bat
 self-compiling: TCC.PRG 0.9.24 (compiled by GCC or TCC.PRG's itself)
